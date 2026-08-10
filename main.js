@@ -1,5 +1,6 @@
 ﻿const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const { Menu, shell, screen } = require("electron");
+const { autoUpdater } = require("electron-updater");
 const { spawn, execFile } = require("child_process");
 const path = require("path");
 const os = require("os");
@@ -21,6 +22,59 @@ let codexReconnectAttempt = 0;
 let shuttingDown = false;
 
 const WINDOW_STATE_FILE = "window-state.json";
+let updatePromptShown = false;
+
+function setupAutoUpdater() {
+  if (!app.isPackaged) return;
+
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("update-available", async (info) => {
+    if (updatePromptShown) return;
+    updatePromptShown = true;
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: "info",
+      title: "发现新版本",
+      message: `DeepSeek Codex ${info.version} 已发布`,
+      detail: "可以现在下载，下载完成后重启应用即可完成更新。",
+      buttons: ["下载更新", "稍后提醒"],
+      defaultId: 0,
+      cancelId: 1
+    });
+    updatePromptShown = false;
+    if (result.response === 0) {
+      try {
+        await autoUpdater.downloadUpdate();
+      } catch {
+        dialog.showErrorBox("更新下载失败", "暂时无法下载更新，请稍后重试。");
+      }
+    }
+  });
+
+  autoUpdater.on("update-downloaded", async () => {
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: "info",
+      title: "更新已下载",
+      message: "新版本已经准备完成。",
+      detail: "现在重启应用即可完成更新。",
+      buttons: ["立即重启", "稍后"],
+      defaultId: 0,
+      cancelId: 1
+    });
+    if (result.response === 0) autoUpdater.quitAndInstall();
+  });
+
+  autoUpdater.on("error", () => {
+    // 更新失败不影响当前版本继续使用。
+  });
+
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch(() => {
+      // 没有网络或当前版本尚未发布时静默跳过。
+    });
+  }, 5000);
+}
 
 function getWindowStatePath() {
   return path.join(app.getPath("userData"), WINDOW_STATE_FILE);
@@ -3212,6 +3266,7 @@ app.whenReady().then(
   async () => {
     cleanupStaleAttachmentFiles();
     createWindow();
+    setupAutoUpdater();
 
     await startCodexAppServer();
 

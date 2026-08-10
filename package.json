@@ -32,7 +32,8 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/brand/deepseek-codex-app.ico"
+      "icon": "assets/brand/deepseek-codex-app.ico",
+      "artifactName": "DeepSeek-Codex-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -51,9 +52,16 @@
       "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
       "uninstallDisplayName": "DeepSeek Codex ${version}"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Slimswd",
+      "repo": "DeepSeek-Codex-GUI",
+      "releaseType": "release"
     }
   },
   "dependencies": {
-    "@phosphor-icons/web": "^2.1.2"
+    "@phosphor-icons/web": "^2.1.2",
+    "electron-updater": "^6.8.9"
   }
 }
