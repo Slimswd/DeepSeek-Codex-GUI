@@ -330,3 +330,4 @@
 - 构建时自动下载并验证固定版本的 Codex CLI Windows 内置组件。
 - 自动上传 NSIS 安装包、blockmap 和 latest.yml，供客户端自动更新。
 - 修复标签构建时 electron-builder 隐式发布导致缺少 GH_TOKEN 的失败，改为构建与上传职责分离。
+- `v1.0.8` 已通过 GitHub Actions 真实发布验证，三个自动更新资产均可在 Release 获取。

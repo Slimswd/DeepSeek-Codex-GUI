@@ -554,3 +554,4 @@
 - 发布前自动校验标签与应用版本一致，并运行三个 JavaScript 语法检查。
 - `v1.0.7` 首次运行已验证 CLI 下载、语法检查和安装包构建均成功；发现标签触发了 electron-builder 隐式上传并因缺少令牌失败。
 - 已禁止构建阶段隐式发布，统一由 Actions Release 步骤上传文件；`v1.0.8` 用于第二次完整验证。
+- `v1.0.8` 已完成真实云端验证：Windows 构建成功，GitHub Release 自动创建，EXE、blockmap 和 latest.yml 均已上传。
