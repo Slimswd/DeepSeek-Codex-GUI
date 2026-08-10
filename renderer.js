@@ -14,6 +14,7 @@ const sideChatMessages = document.querySelector(".side-chat-messages");
 const sideChatForm = document.querySelector(".side-chat-form");
 const sideChatInput = document.querySelector(".side-chat-input");
 const sideChatToggle = document.querySelector(".side-chat-toggle");
+const checkUpdateButton = document.querySelector(".check-update-button");
 const sideTaskOverview = document.querySelector(".side-task-overview");
 const sideTaskStatus = document.querySelector(".side-task-status");
 const sideTaskSteps = document.querySelector(".side-task-steps");
@@ -124,7 +125,7 @@ function renderSideTaskPanel(task) {
 }
 
 if (sideChatPanel && sideChatForm && sideChatInput) {
-  sideChatToggle?.addEventListener("click", () => {
+sideChatToggle?.addEventListener("click", () => {
     sideChatPanel.classList.add("open");
     sideChatInput.focus();
   });
@@ -223,6 +224,17 @@ window.addEventListener("resize", () => {
     textarea.style.height = `${nextHeight}px`;
   }
   saveComposerTextareaHeight();
+});
+
+checkUpdateButton?.addEventListener("click", async () => {
+  checkUpdateButton.disabled = true;
+  try {
+    await window.deepseekCodex.checkForUpdates();
+  } finally {
+    setTimeout(() => {
+      checkUpdateButton.disabled = false;
+    }, 1500);
+  }
 });
 
 const turnStatusPill =

@@ -125,6 +125,11 @@ body {
   background: #0d1218;
 }
 
+.topbar-actions { display: flex; align-items: center; gap: 10px; }
+.check-update-button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border: 1px solid #344252; border-radius: 999px; background: #151c25; color: #c7d2de; cursor: pointer; font-size: 12px; }
+.check-update-button:hover { border-color: #f47721; color: #fff; }
+.check-update-button:disabled { opacity: .58; cursor: wait; }
+
 .project-name {
   font-weight: 600;
 }
@@ -400,7 +405,10 @@ textarea {
         <span class="dot"></span>
         V4 Flash · High
       </div>
-      <button class="side-chat-toggle" type="button" aria-label="打开辅助聊天"><i class="ph ph-chat-circle-dots"></i><span>辅助聊天</span></button>
+      <div class="topbar-actions">
+        <button class="check-update-button" type="button" aria-label="检查更新"><i class="ph ph-arrow-clockwise"></i><span>检查更新</span></button>
+        <button class="side-chat-toggle" type="button" aria-label="打开辅助聊天"><i class="ph ph-chat-circle-dots"></i><span>辅助聊天</span></button>
+      </div>
     </header>
 
     <section class="chat">

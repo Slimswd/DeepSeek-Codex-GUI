@@ -3026,6 +3026,36 @@ ipcMain.handle("configure-deepseek-api", (_event, apiKey) => {
 
 ipcMain.handle("test-deepseek-connection", () => testDeepSeekConnection());
 ipcMain.handle("run-onboarding-task-test", () => runOnboardingTaskTest());
+ipcMain.handle("check-for-updates", async () => {
+  if (!app.isPackaged) {
+    await dialog.showMessageBox(mainWindow, {
+      type: "info",
+      title: "检查更新",
+      message: "开发环境不执行更新检查。",
+      detail: "请使用已安装的正式版本进行更新测试。"
+    });
+    return { ok: true, development: true };
+  }
+
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    if (!result || result.updateInfo.version === app.getVersion()) {
+      await dialog.showMessageBox(mainWindow, {
+        type: "info",
+        title: "检查更新",
+        message: "当前已经是最新版本。"
+      });
+    }
+    return { ok: true, version: result?.updateInfo?.version || app.getVersion() };
+  } catch {
+    await dialog.showMessageBox(mainWindow, {
+      type: "warning",
+      title: "检查更新失败",
+      message: "暂时无法连接 GitHub Releases，请检查网络后重试。"
+    });
+    return { ok: false };
+  }
+});
 
 ipcMain.handle(
   "send-message",

@@ -72,7 +72,8 @@ contextBridge.exposeInMainWorld("deepseekCodex", {
     installCodexCli: () => ipcRenderer.invoke("install-codex-cli"),
     configureDeepSeekApi: (apiKey) => ipcRenderer.invoke("configure-deepseek-api", apiKey),
     testDeepSeekConnection: () => ipcRenderer.invoke("test-deepseek-connection"),
-    runOnboardingTaskTest: () => ipcRenderer.invoke("run-onboarding-task-test"),
+  runOnboardingTaskTest: () => ipcRenderer.invoke("run-onboarding-task-test"),
+  checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
 
   getGitStatus: () =>
     ipcRenderer.invoke("get-git-status"),
