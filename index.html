@@ -1,0 +1,510 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek Codex</title>
+<link rel="icon" href="assets/brand/deepseek-codex-ink-mark.png">
+<link rel="stylesheet" href="node_modules/@phosphor-icons/web/src/regular/style.css">
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  background: #0b0f14;
+  color: #e8edf3;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app {
+  height: 100vh;
+  display: grid;
+  grid-template-columns: 245px 1fr;
+}
+
+.sidebar {
+  background: #0f141b;
+  border-right: 1px solid #202833;
+  padding: 18px 14px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px 20px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: linear-gradient(135deg,#6d5dfc,#29b6f6);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+}
+
+.new-task {
+  border: 1px solid #303948;
+  background: #171d26;
+  color: white;
+  border-radius: 10px;
+  padding: 11px 12px;
+  text-align: left;
+  cursor: pointer;
+  margin-bottom: 20px;
+}
+
+.section-title {
+  color: #778394;
+  font-size: 12px;
+  margin: 8px 8px;
+}
+
+.project {
+  padding: 10px;
+  border-radius: 9px;
+  color: #bbc5d2;
+  font-size: 14px;
+}
+
+.project.active {
+  background: #1a2230;
+  color: white;
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+  padding: 12px 8px;
+  border-top: 1px solid #202833;
+  flex: 0 0 auto;
+}
+
+.model-small {
+  color: #7f8b9d;
+  font-size: 12px;
+}
+
+.sidebar-bottom { position: relative; }
+.sidebar-orb-status { position: absolute; right: 12px; bottom: 12px; width: 54px; height: 54px; display: grid; place-items: center; border-radius: 50%; pointer-events: none; }
+.sidebar-orb-status::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: rgba(244,119,33,.18); box-shadow: 0 0 18px rgba(244,119,33,.4); opacity: .72; transition: .35s ease; }
+.sidebar-orb-status img { position: relative; z-index: 1; width: 48px; height: 48px; object-fit: contain; filter: drop-shadow(0 0 7px rgba(244,119,33,.55)); transition: filter .35s ease; }
+.sidebar-orb-status.running img { animation: four-star-spin 2.8s linear infinite; filter: drop-shadow(0 0 12px rgba(244,119,33,.95)); }
+.sidebar-orb-status.running::before { animation: four-star-aura 1.5s ease-in-out infinite alternate; }
+.sidebar-orb-status.completed img { filter: hue-rotate(92deg) saturate(1.2) drop-shadow(0 0 12px rgba(85,211,155,.9)); }
+.sidebar-orb-status.completed::before { background: rgba(85,211,155,.2); box-shadow: 0 0 20px rgba(85,211,155,.58); }
+.sidebar-orb-status.error img { filter: hue-rotate(305deg) saturate(1.45) drop-shadow(0 0 12px rgba(239,113,105,.9)); }
+@keyframes four-star-spin { to { transform: rotate(360deg); } }
+@keyframes four-star-aura { from { transform: scale(.86); opacity: .48; } to { transform: scale(1.12); opacity: .92; } }
+
+.main {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.topbar {
+  height: 64px;
+  border-bottom: 1px solid #202833;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: #0d1218;
+}
+
+.project-name {
+  font-weight: 600;
+}
+
+.model-pill {
+  background: #151c25;
+  border: 1px solid #2c3744;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #39d98a;
+  margin-right: 7px;
+}
+
+.chat {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 38px max(40px, calc((100% - 800px) / 2));
+}
+
+.welcome {
+  margin-top: 70px;
+}
+
+.hero-title-image {
+  display: block;
+  width: min(100%, 640px);
+  height: auto;
+  margin: 0 0 10px;
+}
+
+.welcome p {
+  color: #8c98a8;
+  line-height: 1.7;
+}
+
+.quick-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.quick {
+  background: #111820;
+  border: 1px solid #242e3a;
+  border-radius: 13px;
+  padding: 16px;
+}
+
+.quick strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.quick span {
+  font-size: 13px;
+  color: #7e8a9a;
+}
+
+.composer-wrap {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 16px 26px 24px;
+}
+
+.composer {
+  max-width: 860px;
+  margin: auto;
+  background: #131a23;
+  border: 1px solid #2a3543;
+  border-radius: 16px;
+  padding: 13px;
+}
+
+textarea {
+  width: 100%;
+  height: 70px;
+  min-height: 54px;
+  max-height: 260px;
+  resize: vertical;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: white;
+  font: inherit;
+  font-size: 15px;
+}
+
+.composer-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.project-button {
+  color: #8996a7;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.send {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 11px;
+  cursor: pointer;
+  background: #e9edf3;
+  color: #11151b;
+  font-size: 19px;
+}
+
+.message-row {
+  display: flex;
+  margin: 18px 0;
+}
+
+.message-row.user {
+  justify-content: flex-end;
+}
+
+.message-row.assistant {
+  justify-content: flex-start;
+}
+
+.message-bubble {
+  max-width: 78%;
+  padding: 14px 17px;
+  border-radius: 16px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 14px;
+}
+
+.message-row.user .message-bubble {
+  background: #243247;
+  color: #f5f8fc;
+  border-bottom-right-radius: 5px;
+}
+
+.message-row.assistant .message-bubble {
+  background: #111820;
+  border: 1px solid #26313d;
+  color: #dfe7f1;
+  border-bottom-left-radius: 5px;
+}
+
+.send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.side-chat-panel {
+  position: absolute;
+  z-index: 8;
+  top: 76px;
+  right: 18px;
+  bottom: 18px;
+  width: min(31vw, 430px);
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border: 1px solid rgba(244, 119, 33, .35);
+  border-radius: 18px;
+  background: rgba(9, 16, 24, .88);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .32), inset 0 1px 0 rgba(255,255,255,.06);
+  backdrop-filter: blur(18px);
+  display: none;
+}
+.side-chat-panel.open { display: flex; }
+.side-chat-panel.collapsed { width: 48px; min-width: 48px; padding: 10px; overflow: hidden; }
+.side-chat-panel.collapsed .side-chat-header { border: 0; padding: 0; justify-content: center; }
+.side-chat-panel.collapsed .side-chat-header > div { display: none; }
+.side-chat-panel.collapsed .side-chat-close { transform: rotate(180deg); }
+.side-chat-panel.collapsed .side-chat-messages, .side-chat-panel.collapsed .side-chat-form { display: none; }
+.side-chat-toggle { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border: 1px solid #2c3744; border-radius: 999px; color: #c6d0db; background: #151c25; cursor: pointer; font-size: 12px; }
+.side-chat-toggle:hover { border-color: #f47721; color: #fff; background: #1b2631; }
+.side-chat-toggle i { color: #f47721; font-size: 15px; }
+
+.side-chat-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(151,174,194,.16); }
+.side-chat-title { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 700; }
+.side-chat-title i { color: #f47721; font-size: 18px; }
+.side-chat-subtitle { margin-top: 3px; color: #8190a2; font-size: 11px; }
+.side-chat-close { width: 28px; height: 28px; border: 1px solid #2b3a49; border-radius: 8px; color: #aeb9c5; background: transparent; cursor: pointer; }
+.side-chat-close:hover { color: white; border-color: #f47721; }
+.side-chat-messages { flex: 1; min-height: 0; overflow: auto; padding: 14px 2px; }
+.side-chat-empty { padding: 28px 14px; color: #8492a3; font-size: 12px; line-height: 1.7; text-align: center; }
+.side-chat-note { margin: 8px 0; padding: 10px 12px; border: 1px solid #253442; border-radius: 11px; color: #aebaca; background: rgba(17, 28, 39, .72); font-size: 12px; line-height: 1.6; }
+.side-chat-note.user { border-color: rgba(244,119,33,.32); color: #f3eee8; background: rgba(102,53,24,.35); }
+.side-task-overview { padding: 10px 0 14px; border-bottom: 1px solid rgba(151,174,194,.12); overflow: hidden; }
+.side-task-kicker { color: #f47721; font-size: 9px; font-weight: 800; letter-spacing: .16em; }
+.side-task-overview strong { display: block; margin-top: 5px; color: #eef3f7; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-task-meta { display: block; margin-top: 3px; color: #7f8d9e; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-task-section { padding: 13px 0; border-bottom: 1px solid rgba(151,174,194,.1); }
+.side-section-title { margin-bottom: 9px; color: #8e9bab; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.side-status-row { display: flex; align-items: center; gap: 8px; color: #ecf2f7; font-size: 12px; }
+.side-status-row .side-task-meta { margin: 0 0 0 auto; max-width: 130px; }
+.side-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #778394; box-shadow: 0 0 10px rgba(119,131,148,.6); }
+.side-status-dot[data-status="running"], .side-status-dot[data-status="starting"], .side-status-dot[data-status="waitingApproval"] { background: #f47721; box-shadow: 0 0 12px rgba(244,119,33,.8); }
+.side-status-dot[data-status="completed"] { background: #55d39b; }
+.side-status-dot[data-status="error"] { background: #ef7169; }
+.side-step { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0; color: #b7c2ce; font-size: 11px; line-height: 1.45; }
+.side-step i { flex: 0 0 auto; color: #f47721; font-size: 14px; }
+.side-approval { padding: 9px; border: 1px solid rgba(244,119,33,.35); border-radius: 9px; background: rgba(102,53,24,.22); }
+.side-approval strong, .side-approval span { display: block; font-size: 11px; }
+.side-approval span { margin-top: 4px; color: #c4cbd4; line-height: 1.45; }
+.side-usage { display: flex; align-items: baseline; justify-content: space-between; color: #c5cfda; font-size: 11px; }
+.side-usage strong { color: #f47721; font-size: 16px; }
+.side-chat-form { display: flex; gap: 8px; align-items: flex-end; padding-top: 12px; border-top: 1px solid rgba(151,174,194,.16); }
+.side-chat-input { flex: 1; min-height: 72px; max-height: 150px; padding: 10px; border: 1px solid #2b3a49; border-radius: 11px; resize: vertical; color: #eef3f7; background: rgba(5, 10, 16, .72); outline: none; font: inherit; font-size: 12px; }
+.side-chat-input:focus { border-color: #f47721; box-shadow: 0 0 0 3px rgba(244,119,33,.1); }
+.side-chat-send { width: 36px; height: 36px; border: 0; border-radius: 10px; color: #171b20; background: #f1eee8; cursor: pointer; }
+.side-chat-send:disabled { opacity: .45; cursor: default; }
+@media (max-width: 1050px) { .side-chat-panel { width: 34vw; min-width: 280px; } }
+@media (max-width: 820px) { .side-chat-panel { top: 72px; right: 10px; bottom: 10px; left: 10px; width: auto; min-width: 0; } }
+
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <aside class="sidebar">
+
+    <div class="brand">
+      <div class="logo">D</div>
+      DeepSeek Codex
+    </div>
+
+    <button class="new-task">＋ 新建任务</button>
+
+    <div class="section-title">最近项目</div>
+
+    <div class="project active">
+      DeepSeek Codex GUI
+    </div>
+
+    <div class="project">
+      亚马逊翻新助手
+    </div>
+
+    <div class="project">
+      广告数据系统
+    </div>
+
+    <div class="sidebar-bottom">
+      <div>DeepSeek V4 Flash</div>
+      <div class="model-small">High reasoning</div>
+      <div class="sidebar-orb-status" data-status="idle" title="任务状态">
+        <img src="assets/dragonball-four-star.png" alt="四星球任务状态">
+      </div>
+    </div>
+
+  </aside>
+
+  <main class="main">
+
+    <header class="topbar">
+      <div class="project-name">DeepSeek Codex GUI</div>
+
+      <div class="model-pill">
+        <span class="dot"></span>
+        V4 Flash · High
+      </div>
+      <button class="side-chat-toggle" type="button" aria-label="打开辅助聊天"><i class="ph ph-chat-circle-dots"></i><span>辅助聊天</span></button>
+    </header>
+
+    <section class="chat">
+
+      <div class="welcome">
+
+        <img class="hero-title-image" src="assets/hero-title-reference-transparent.png" alt="今天想开发什么？">
+
+        <p>
+          DeepSeek V4 Flash 已准备就绪。<br>
+          选择一个项目，然后告诉 Codex 需要完成的任务。
+        </p>
+
+        <div class="quick-grid">
+
+          <button type="button" class="quick" data-prompt="请检查整个项目，分析目录、代码和潜在问题。">
+            <span class="quick-icon"><i class="ph ph-folder-open"></i></span>
+            <span class="quick-copy">
+              <strong>检查整个项目</strong>
+              <span>分析目录、代码和潜在问题</span>
+            </span>
+            <i class="ph ph-caret-right quick-arrow"></i>
+          </button>
+
+          <button type="button" class="quick" data-prompt="请检查当前项目并修复 Bug，定位错误并修改相关文件。">
+            <span class="quick-icon"><i class="ph ph-wrench"></i></span>
+            <span class="quick-copy">
+              <strong>修复 Bug</strong>
+              <span>定位错误并修改相关文件</span>
+            </span>
+            <i class="ph ph-caret-right quick-arrow"></i>
+          </button>
+
+          <button type="button" class="quick" data-prompt="我想为当前项目增加一个新功能，请先检查现有实现并协助完成开发。">
+            <span class="quick-icon"><i class="ph ph-lightning"></i></span>
+            <span class="quick-copy">
+              <strong>增加新功能</strong>
+              <span>描述需求，让 Agent 完成开发</span>
+            </span>
+            <i class="ph ph-caret-right quick-arrow"></i>
+          </button>
+
+          <button type="button" class="quick" data-prompt="请优化当前项目代码，重点检查结构、性能和可维护性。">
+            <span class="quick-icon"><i class="ph ph-code"></i></span>
+            <span class="quick-copy">
+              <strong>优化代码</strong>
+              <span>检查结构、性能和可维护性</span>
+            </span>
+            <i class="ph ph-caret-right quick-arrow"></i>
+          </button>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <aside class="side-chat-panel" aria-label="辅助聊天面板">
+      <div class="side-chat-header">
+        <div>
+          <div class="side-chat-title"><i class="ph ph-sidebar-simple"></i><span>当前任务</span></div>
+          <div class="side-chat-subtitle">任务上下文与执行控制</div>
+        </div>
+        <button class="side-chat-close" type="button" aria-label="收起辅助聊天"><i class="ph ph-caret-right"></i></button>
+      </div>
+      <div class="side-chat-messages">
+        <div class="side-task-overview"></div>
+        <div class="side-task-section side-task-status"></div>
+        <div class="side-task-section side-task-steps"></div>
+        <div class="side-task-section side-task-files"></div>
+        <div class="side-task-section side-task-approvals"></div>
+        <div class="side-task-section side-task-usage"></div>
+      </div>
+      <form class="side-chat-form">
+        <textarea class="side-chat-input" placeholder="追问当前任务…"></textarea>
+        <button class="side-chat-send" type="submit" aria-label="发送辅助消息"><i class="ph ph-arrow-up"></i></button>
+      </form>
+    </aside>
+
+    <div class="composer-wrap">
+
+      <div class="composer">
+
+        <textarea placeholder="给 DeepSeek Codex 一个任务…"></textarea>
+
+        <div class="composer-bottom">
+
+          <div class="project-button">
+            <i class="ph ph-folder-simple"></i><span>选择项目</span>
+          </div>
+
+          <button class="send" aria-label="发送"><i class="ph ph-arrow-up"></i></button>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+</div>
+
+<script src="renderer.js"></script></body>
+</html>
+
+

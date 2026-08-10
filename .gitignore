@@ -1,0 +1,29 @@
+# Dependencies and build output
+node_modules/
+dist/
+release-notes-web-v1.1.0/
+*.zip
+*.exe
+resources/codex-cli/*.tgz
+
+# Local backups and temporary snapshots
+backup-*/
+*-before-*.js
+GUI_AGENT_TEST.txt
+
+# Local diagnostics and generated previews
+design-qa/
+release-notes-qa-*.png
+
+# Local credentials and runtime state
+.env
+.env.*
+*.local
+config.toml
+*.log
+
+# OS/editor files
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/

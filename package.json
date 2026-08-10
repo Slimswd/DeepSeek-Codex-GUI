@@ -1,0 +1,59 @@
+{
+  "name": "deepseek-codex-gui",
+  "version": "1.0.3",
+  "description": "DeepSeek V4 Flash powered Codex desktop client",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron .",
+    "dist": "electron-builder --win nsis"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^43.3.0",
+    "electron-builder": "^26.15.3"
+  },
+  "productName": "DeepSeek Codex",
+  "build": {
+    "appId": "com.widdie.deepseekcodex",
+    "productName": "DeepSeek Codex",
+    "files": [
+      "**/*",
+      "!backup-*/**",
+      "!design-qa/**",
+      "!design-qa.md",
+      "!dist/**"
+    ],
+    "asarUnpack": [
+      "resources/codex-cli/*.tgz"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/brand/deepseek-codex-app.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": false,
+      "include": "build/installer.nsh",
+      "installerHeader": "build/installerHeader.bmp",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/uninstallerSidebar.bmp",
+      "installerIcon": "assets/brand/deepseek-codex-app.ico",
+      "uninstallerIcon": "assets/brand/deepseek-codex-app.ico",
+      "installerLanguages": [
+        "zh_CN"
+      ],
+      "language": "2052",
+      "shortcutName": "DeepSeek Codex",
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "uninstallDisplayName": "DeepSeek Codex ${version}"
+    }
+  },
+  "dependencies": {
+    "@phosphor-icons/web": "^2.1.2"
+  }
+}
