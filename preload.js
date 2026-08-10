@@ -150,6 +150,10 @@ contextBridge.exposeInMainWorld("deepseekCodex", {
       projectPath
     ),
 
+  getProjectWorkspace: () => ipcRenderer.invoke("get-project-workspace"),
+  searchProjectWorkspace: (query) => ipcRenderer.invoke("search-project-workspace", query),
+  openProjectFile: (relativePath) => ipcRenderer.invoke("open-project-file", relativePath),
+
   interruptTurn: (context = {}) =>
     ipcRenderer.invoke("interrupt-turn", {
       threadId: context?.threadId || null,

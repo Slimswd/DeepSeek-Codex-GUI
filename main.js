@@ -2992,6 +2992,63 @@ ipcMain.handle(
   }
 );
 
+function resolveWorkspacePath(projectPath, relativePath = "") {
+  if (!projectPath || typeof projectPath !== "string") throw new Error("未选择项目");
+  const root = path.resolve(projectPath);
+  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) throw new Error("项目文件夹不存在");
+  const target = path.resolve(root, relativePath || ".");
+  if (target !== root && !target.startsWith(`${root}${path.sep}`)) throw new Error("路径超出项目目录");
+  return { root, target };
+}
+
+function listWorkspaceEntries(projectPath, query = "") {
+  const { root } = resolveWorkspacePath(projectPath);
+  const ignored = new Set([".git", "node_modules", "dist", "release", "backup", "backups"]);
+  const result = [];
+  const needle = String(query || "").trim().toLowerCase();
+  const walk = (directory, depth) => {
+    if (depth > 5 || result.length >= 800) return;
+    let entries = [];
+    try { entries = fs.readdirSync(directory, { withFileTypes: true }); } catch { return; }
+    entries.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name));
+    for (const entry of entries) {
+      if (ignored.has(entry.name) || entry.name.startsWith(".")) continue;
+      const absolute = path.join(directory, entry.name);
+      const relative = path.relative(root, absolute).replaceAll(path.sep, "/");
+      if (needle && !relative.toLowerCase().includes(needle)) {
+        if (entry.isDirectory()) walk(absolute, depth + 1);
+        continue;
+      }
+      let stat;
+      try { stat = fs.statSync(absolute); } catch { continue; }
+      result.push({ name: entry.name, path: relative, type: entry.isDirectory() ? "directory" : "file", size: stat.size, modifiedAt: stat.mtimeMs });
+      if (entry.isDirectory()) walk(absolute, depth + 1);
+      if (result.length >= 800) return;
+    }
+  };
+  walk(root, 0);
+  return result;
+}
+
+ipcMain.handle("get-project-workspace", () => {
+  const projectPath = agentState.projectPath;
+  const entries = listWorkspaceEntries(projectPath);
+  return { projectPath, entries, recent: entries.filter(item => item.type === "file").sort((a, b) => b.modifiedAt - a.modifiedAt).slice(0, 8) };
+});
+
+ipcMain.handle("search-project-workspace", (_event, query) => ({
+  projectPath: agentState.projectPath,
+  entries: listWorkspaceEntries(agentState.projectPath, query).slice(0, 120)
+}));
+
+ipcMain.handle("open-project-file", async (_event, relativePath) => {
+  const { target } = resolveWorkspacePath(agentState.projectPath, relativePath);
+  if (!fs.statSync(target).isFile()) throw new Error("只能打开文件");
+  const errorMessage = await shell.openPath(target);
+  if (errorMessage) throw new Error(errorMessage);
+  return { ok: true };
+});
+
 ipcMain.handle(
   "get-permission-settings",
   () => ({ mode: permissionMode })

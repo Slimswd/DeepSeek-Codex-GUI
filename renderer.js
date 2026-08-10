@@ -24,7 +24,32 @@ const sideTaskSteps = document.querySelector(".side-task-steps");
 const sideTaskFiles = document.querySelector(".side-task-files");
 const sideTaskApprovals = document.querySelector(".side-task-approvals");
 const sideTaskUsage = document.querySelector(".side-task-usage");
+const workspaceButton = document.querySelector(".workspace-button");
+const workspacePanel = document.querySelector(".workspace-panel");
+const workspaceClose = document.querySelector(".workspace-close");
+const workspaceSearch = document.querySelector(".workspace-search");
+const workspaceList = document.querySelector(".workspace-list");
 let permissionMode = "ask";
+
+function renderWorkspace(data) {
+  if (!workspaceList) return;
+  if (!data?.projectPath) { workspaceList.innerHTML = '<div class="side-chat-empty">请先选择一个项目。</div>'; return; }
+  const entries = Array.isArray(data.entries) ? data.entries : [];
+  const recentPaths = new Set((data.recent || []).map(item => item.path));
+  const recent = entries.filter(item => recentPaths.has(item.path));
+  const renderItems = items => items.map(item => `<button class="workspace-item" data-workspace-path="${escapeHtml(item.path)}"><i class="ph ${item.type === "directory" ? "ph-folder" : "ph-file"}"></i><span>${escapeHtml(item.path)}</span>${item.type === "file" ? `<small>${formatWorkspaceSize(item.size)}</small>` : ""}</button>`).join("");
+  workspaceList.innerHTML = `${recent.length ? `<div class="workspace-section">最近修改</div>${renderItems(recent)}` : ""}<div class="workspace-section">项目文件</div>${renderItems(entries) || '<div class="side-chat-empty">没有找到项目文件。</div>'}`;
+  workspaceList.querySelectorAll("[data-workspace-path]").forEach(button => button.addEventListener("click", async () => {
+    const item = entries.find(entry => entry.path === button.dataset.workspacePath);
+    if (item?.type === "file") await window.deepseekCodex.openProjectFile(item.path);
+  }));
+}
+function formatWorkspaceSize(size) { if (!Number.isFinite(size)) return ""; return size > 1048576 ? `${(size / 1048576).toFixed(1)} MB` : size > 1024 ? `${Math.round(size / 1024)} KB` : `${size} B`; }
+async function refreshWorkspace(query = "") { try { renderWorkspace(query ? await window.deepseekCodex.searchProjectWorkspace(query) : await window.deepseekCodex.getProjectWorkspace()); } catch (error) { if (workspaceList) workspaceList.innerHTML = `<div class="side-chat-empty">${escapeHtml(error.message)}</div>`; } }
+workspaceButton?.addEventListener("click", async () => { workspacePanel.hidden = false; await refreshWorkspace(); workspaceSearch?.focus(); });
+workspaceClose?.addEventListener("click", () => { workspacePanel.hidden = true; });
+let workspaceSearchTimer;
+workspaceSearch?.addEventListener("input", () => { clearTimeout(workspaceSearchTimer); workspaceSearchTimer = setTimeout(() => refreshWorkspace(workspaceSearch.value), 180); });
 const permissionButton = document.createElement("button");
 permissionButton.type = "button";
 permissionButton.className = "permission-button";
