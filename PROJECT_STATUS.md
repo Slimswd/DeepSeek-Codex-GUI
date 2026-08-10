@@ -552,4 +552,5 @@
 - 已新增 Windows 自动发布工作流，推送版本标签后自动构建并创建 GitHub Release。
 - 工作流会从官方 npm 源下载固定版本的 Codex CLI Windows 组件，避免安装包缺少内置 CLI。
 - 发布前自动校验标签与应用版本一致，并运行三个 JavaScript 语法检查。
-- 首次 Actions 实际运行仍待验证。
+- `v1.0.7` 首次运行已验证 CLI 下载、语法检查和安装包构建均成功；发现标签触发了 electron-builder 隐式上传并因缺少令牌失败。
+- 已禁止构建阶段隐式发布，统一由 Actions Release 步骤上传文件；`v1.0.8` 用于第二次完整验证。

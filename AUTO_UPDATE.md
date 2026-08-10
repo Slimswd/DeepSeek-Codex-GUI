@@ -15,7 +15,7 @@
 
 1. 更新 `package.json` 和 `package-lock.json` 中的版本号。
 2. 提交并推送代码。
-3. 创建并推送同版本标签，例如 `v1.0.7`。
+3. 创建并推送同版本标签，例如 `v1.0.8`。
 4. GitHub Actions 在 Windows runner 上自动下载固定版本的 Codex CLI。
 5. Actions 自动检查 JavaScript、生成 NSIS 安装包，并创建 GitHub Release。
 6. Release 自动上传安装包、`latest.yml` 和 `.blockmap`。
