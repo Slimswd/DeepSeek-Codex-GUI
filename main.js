@@ -37,7 +37,7 @@ function setupAutoUpdater() {
       type: "info",
       title: "发现新版本",
       message: `DeepSeek Codex ${info.version} 已发布`,
-      detail: "可以现在下载，下载完成后重启应用即可完成更新。",
+      detail: `当前版本：${app.getVersion()}\n目标版本：${info.version}\n\n可以现在下载，下载完成后重启应用即可完成更新。`,
       buttons: ["下载更新", "稍后提醒"],
       defaultId: 0,
       cancelId: 1
@@ -3043,7 +3043,7 @@ ipcMain.handle("check-for-updates", async () => {
       await dialog.showMessageBox(mainWindow, {
         type: "info",
         title: "检查更新",
-        message: "当前已经是最新版本。"
+        message: `当前已经是最新版本（${app.getVersion()}）。`
       });
     }
     return { ok: true, version: result?.updateInfo?.version || app.getVersion() };
