@@ -53,6 +53,7 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on("update-downloaded", async () => {
+    mainWindow?.webContents.send("update-download-progress", { percent: 100, completed: true });
     const result = await dialog.showMessageBox(mainWindow, {
       type: "info",
       title: "更新已下载",
@@ -63,6 +64,14 @@ function setupAutoUpdater() {
       cancelId: 1
     });
     if (result.response === 0) autoUpdater.quitAndInstall();
+  });
+
+  autoUpdater.on("download-progress", (progress) => {
+    mainWindow?.webContents.send("update-download-progress", {
+      percent: Math.max(0, Math.min(100, Math.round(progress.percent))),
+      transferred: progress.transferred,
+      total: progress.total
+    });
   });
 
   autoUpdater.on("error", () => {

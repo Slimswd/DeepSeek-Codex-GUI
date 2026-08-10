@@ -15,6 +15,9 @@ const sideChatForm = document.querySelector(".side-chat-form");
 const sideChatInput = document.querySelector(".side-chat-input");
 const sideChatToggle = document.querySelector(".side-chat-toggle");
 const checkUpdateButton = document.querySelector(".check-update-button");
+const updateProgressToast = document.querySelector(".update-progress-toast");
+const updateProgressBar = document.querySelector(".update-progress-bar");
+const updateProgressPercent = updateProgressToast?.querySelector("strong");
 const sideTaskOverview = document.querySelector(".side-task-overview");
 const sideTaskStatus = document.querySelector(".side-task-status");
 const sideTaskSteps = document.querySelector(".side-task-steps");
@@ -234,6 +237,18 @@ checkUpdateButton?.addEventListener("click", async () => {
     setTimeout(() => {
       checkUpdateButton.disabled = false;
     }, 1500);
+  }
+});
+
+window.deepseekCodex.onUpdateDownloadProgress?.((data) => {
+  if (!updateProgressToast) return;
+  updateProgressToast.hidden = false;
+  const percent = Number(data?.percent || 0);
+  if (updateProgressBar) updateProgressBar.style.width = `${percent}%`;
+  if (updateProgressPercent) updateProgressPercent.textContent = `${percent}%`;
+  if (data?.completed) {
+    updateProgressToast.querySelector("span").textContent = "更新下载完成，准备重启";
+    setTimeout(() => { updateProgressToast.hidden = true; }, 2500);
   }
 });
 

@@ -74,6 +74,9 @@ contextBridge.exposeInMainWorld("deepseekCodex", {
     testDeepSeekConnection: () => ipcRenderer.invoke("test-deepseek-connection"),
   runOnboardingTaskTest: () => ipcRenderer.invoke("run-onboarding-task-test"),
   checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
+  onUpdateDownloadProgress: (callback) => {
+    ipcRenderer.on("update-download-progress", (_event, data) => callback(data));
+  },
 
   getGitStatus: () =>
     ipcRenderer.invoke("get-git-status"),
