@@ -17,6 +17,10 @@ const sideChatToggle = document.querySelector(".side-chat-toggle");
 const checkUpdateButton = document.querySelector(".check-update-button");
 const updateProgressToast = document.querySelector(".update-progress-toast");
 const updateProgressBar = document.querySelector(".update-progress-bar");
+const updateDialog = document.querySelector(".update-dialog-overlay");
+const updateDialogVersion = document.querySelector(".update-dialog-version");
+const updateDialogPrimary = document.querySelector(".update-dialog-primary");
+const updateDialogLater = document.querySelector(".update-dialog-later");
 const updateProgressPercent = updateProgressToast?.querySelector("strong");
 const sideTaskOverview = document.querySelector(".side-task-overview");
 const sideTaskStatus = document.querySelector(".side-task-status");
@@ -263,6 +267,56 @@ checkUpdateButton?.addEventListener("click", async () => {
       checkUpdateButton.disabled = false;
     }, 1500);
   }
+});
+
+function closeUpdateDialog() {
+  if (updateDialog) updateDialog.hidden = true;
+}
+
+window.deepseekCodex.onUpdateAvailable?.((data) => {
+  if (!updateDialog) return;
+  updateDialogPrimary.dataset.ready = "false";
+  updateDialog.dataset.state = "available";
+  updateDialog.querySelector(".update-dialog-icon").innerHTML = '<i class="ph ph-arrow-circle-down"></i>';
+  updateDialog.querySelector(".update-dialog-kicker").textContent = "DEEPSEEK CODEX · UPDATE";
+  updateDialog.querySelector("#update-dialog-title").textContent = "发现新版本";
+  updateDialogVersion.innerHTML = `<span class="update-version-old">v${data?.currentVersion || "--"}</span><i class="ph ph-arrow-right update-version-arrow"></i><span class="update-version-new">v${data?.version || "--"}</span>`;
+  updateDialog.querySelector(".update-dialog-copy").textContent = "下载将在后台进行，完成后重启应用即可更新。";
+  updateDialogPrimary.disabled = false;
+  updateDialogPrimary.innerHTML = '<i class="ph ph-download-simple"></i> 下载更新';
+  updateDialog.hidden = false;
+});
+
+updateDialogLater?.addEventListener("click", closeUpdateDialog);
+updateDialogPrimary?.addEventListener("click", async () => {
+  if (!updateDialogPrimary) return;
+  if (updateDialogPrimary.dataset.ready === "true") {
+    await window.deepseekCodex.restartToUpdate?.();
+    return;
+  }
+  updateDialogPrimary.disabled = true;
+  updateDialogPrimary.innerHTML = '<i class="ph ph-spinner-gap"></i> 正在准备下载';
+  const result = await window.deepseekCodex.downloadUpdate?.();
+  if (!result?.ok) {
+    updateDialogPrimary.disabled = false;
+    updateDialogPrimary.innerHTML = '<i class="ph ph-download-simple"></i> 重新下载';
+    return;
+  }
+  closeUpdateDialog();
+});
+
+window.deepseekCodex.onUpdateReady?.(() => {
+  if (!updateDialog) return;
+  updateDialog.dataset.state = "ready";
+  updateDialog.querySelector(".update-dialog-icon").innerHTML = '<i class="ph ph-check"></i>';
+  updateDialog.querySelector(".update-dialog-kicker").textContent = "UPDATE READY";
+  updateDialog.querySelector("#update-dialog-title").textContent = "更新已准备完成";
+  updateDialogVersion.innerHTML = '<span class="update-version-new">新版本已下载到本机</span><i class="ph ph-check-circle update-version-arrow"></i>';
+  updateDialog.querySelector(".update-dialog-copy").textContent = "重启后自动完成安装，当前任务与历史记录不会丢失。";
+  updateDialogPrimary.disabled = false;
+  updateDialogPrimary.dataset.ready = "true";
+  updateDialogPrimary.innerHTML = '<i class="ph ph-arrow-clockwise"></i> 立即重启';
+  updateDialog.hidden = false;
 });
 
 window.deepseekCodex.onUpdateDownloadProgress?.((data) => {

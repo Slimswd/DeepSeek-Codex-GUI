@@ -34,37 +34,16 @@ function setupAutoUpdater() {
   autoUpdater.on("update-available", async (info) => {
     if (updatePromptShown) return;
     updatePromptShown = true;
-    const result = await dialog.showMessageBox(mainWindow, {
-      type: "info",
-      title: "发现新版本",
-      message: `DeepSeek Codex ${info.version} 已发布`,
-      detail: `当前版本：${app.getVersion()}\n目标版本：${info.version}\n\n可以现在下载，下载完成后重启应用即可完成更新。`,
-      buttons: ["下载更新", "稍后提醒"],
-      defaultId: 0,
-      cancelId: 1
+    mainWindow?.webContents.send("update-available", {
+      version: info.version,
+      currentVersion: app.getVersion()
     });
     updatePromptShown = false;
-    if (result.response === 0) {
-      try {
-        await autoUpdater.downloadUpdate();
-      } catch {
-        dialog.showErrorBox("更新下载失败", "暂时无法下载更新，请稍后重试。");
-      }
-    }
   });
 
   autoUpdater.on("update-downloaded", async () => {
     mainWindow?.webContents.send("update-download-progress", { percent: 100, completed: true });
-    const result = await dialog.showMessageBox(mainWindow, {
-      type: "info",
-      title: "更新已下载",
-      message: "新版本已经准备完成。",
-      detail: "现在重启应用即可完成更新。",
-      buttons: ["立即重启", "稍后"],
-      defaultId: 0,
-      cancelId: 1
-    });
-    if (result.response === 0) autoUpdater.quitAndInstall();
+    mainWindow?.webContents.send("update-ready");
   });
 
   autoUpdater.on("download-progress", (progress) => {
@@ -85,6 +64,20 @@ function setupAutoUpdater() {
     });
   }, 5000);
 }
+
+ipcMain.handle("download-update", async () => {
+  try {
+    await autoUpdater.downloadUpdate();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: error?.message || "更新下载失败" };
+  }
+});
+
+ipcMain.handle("restart-to-update", () => {
+  autoUpdater.quitAndInstall();
+  return { ok: true };
+});
 
 function getWindowStatePath() {
   return path.join(app.getPath("userData"), WINDOW_STATE_FILE);
