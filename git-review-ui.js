@@ -418,6 +418,17 @@
 }
 .grc-checkpoint-intro i { flex: 0 0 auto; color: #f47721; font-size: 19px; }
 .grc-checkpoint-list { flex: 1; min-height: 0; overflow: auto; padding: 8px 18px 18px; }
+.grc-remote-view { height: 100%; overflow: auto; padding: 18px; }
+.grc-remote-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.grc-remote-card { padding: 14px; border: 1px solid var(--theme-border, #26323f); border-radius: 12px; background: color-mix(in srgb, var(--theme-surface, #111820) 88%, transparent); }
+.grc-remote-card h3 { margin: 0 0 8px; color: var(--theme-text-strong, #f4f7fa); font-size: 13px; }
+.grc-remote-muted { color: var(--theme-subtle, #718298); font-size: 11px; line-height: 1.55; }
+.grc-remote-value { color: var(--theme-text, #dce6f1); font-size: 12px; word-break: break-word; }
+.grc-remote-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.grc-remote-branch { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.grc-remote-branch select { flex: 1; min-height: 34px; padding: 6px 9px; border: 1px solid var(--theme-border-strong, #344456); border-radius: 8px; color: var(--theme-text, #dce6f1); background: var(--theme-input, #0f161e); font: inherit; font-size: 11px; }
+.grc-remote-warning { margin-top: 12px; padding: 10px 12px; border-radius: 9px; color: var(--theme-warning, #f2cf8c); background: rgba(244, 180, 65, .08); font-size: 11px; line-height: 1.5; }
+@media (max-width: 760px) { .grc-remote-grid { grid-template-columns: 1fr; } }
 .grc-checkpoint-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -597,6 +608,7 @@
         </div>
         <div class="grc-toolbar">
           <div class="grc-tabs">
+            <button type="button" class="grc-tab" data-tab="remote">远程同步</button>
             <button type="button" class="grc-tab active" data-tab="changes">当前改动</button>
             <button type="button" class="grc-tab" data-tab="checkpoints">安全存档</button>
           </div>
@@ -631,6 +643,27 @@
               <div class="grc-checkpoint-intro"><i class="ph ph-shield-check"></i><span>安全存档保存在当前 Git 项目内部，但不会写入正常分支历史，也不会随着普通推送上传到 GitHub。恢复前会自动再创建一份保护存档。</span></div>
               <div class="grc-checkpoint-list"></div>
             </div>
+          </div>
+          <div class="grc-view grc-remote-view" data-view="remote" hidden>
+            <div class="grc-remote-grid">
+              <section class="grc-remote-card">
+                <h3>远程仓库</h3>
+                <div class="grc-remote-value grc-remote-origin">未配置远程仓库</div>
+                <div class="grc-remote-muted grc-remote-sync-copy">请先获取远程状态</div>
+                <div class="grc-remote-actions">
+                  <button type="button" class="grc-button grc-fetch"><i class="ph ph-arrow-clockwise"></i>获取更新</button>
+                  <button type="button" class="grc-button grc-pull"><i class="ph ph-download-simple"></i>拉取</button>
+                  <button type="button" class="grc-button primary grc-push"><i class="ph ph-upload-simple"></i>推送</button>
+                </div>
+              </section>
+              <section class="grc-remote-card">
+                <h3>当前分支</h3>
+                <div class="grc-remote-value grc-remote-current-branch">--</div>
+                <div class="grc-remote-branch"><select class="grc-branch-select" aria-label="选择 Git 分支"></select><button type="button" class="grc-button grc-switch-branch">切换</button></div>
+                <div class="grc-remote-muted">切换分支前会检查未提交修改，避免覆盖当前工作。</div>
+              </section>
+            </div>
+            <div class="grc-remote-warning">推送和拉取都会改变远程或本地文件，操作前会显示确认提示。拉取使用快进合并，检测到冲突时不会自动解决。</div>
           </div>
         </div>
         <footer class="grc-footer">
@@ -670,6 +703,14 @@
     const discardButton = overlay.querySelector(".grc-discard");
     const checkpointButton = overlay.querySelector(".grc-checkpoint");
     const commitButton = overlay.querySelector(".grc-commit");
+    const remoteOriginNode = overlay.querySelector(".grc-remote-origin");
+    const remoteSyncCopyNode = overlay.querySelector(".grc-remote-sync-copy");
+    const remoteBranchNode = overlay.querySelector(".grc-remote-current-branch");
+    const branchSelect = overlay.querySelector(".grc-branch-select");
+    const fetchButton = overlay.querySelector(".grc-fetch");
+    const pullButton = overlay.querySelector(".grc-pull");
+    const pushButton = overlay.querySelector(".grc-push");
+    const switchBranchButton = overlay.querySelector(".grc-switch-branch");
 
     let projectPath = null;
     let snapshot = null;
@@ -679,6 +720,7 @@
     let noticeTimer = null;
     let busy = false;
     let refreshVersion = 0;
+    let remoteSnapshot = null;
 
     async function initializeGitAction() {
       if (busy || !projectPath) return;
@@ -746,9 +788,55 @@
         !repositoryReady ||
         !(snapshot?.summary?.staged > 0);
       refreshButton.disabled = busy;
+      const remoteReady = Boolean(remoteSnapshot?.ok && remoteSnapshot?.isRepository);
+      fetchButton.disabled = busy || !remoteReady;
+      pullButton.disabled = busy || !remoteReady || !remoteSnapshot?.upstream;
+      pushButton.disabled = busy || !remoteReady || !remoteSnapshot?.upstream || !(remoteSnapshot?.ahead > 0);
+      switchBranchButton.disabled = busy || !remoteReady || !branchSelect.value || branchSelect.value === remoteSnapshot?.currentBranch;
       selectionCountNode.textContent = `已选 ${items.length}`;
       selectAllNode.checked = Boolean(files().length && items.length === files().length);
       selectAllNode.indeterminate = Boolean(items.length && items.length < files().length);
+    }
+
+    function renderRemote() {
+      const value = remoteSnapshot || {};
+      const remote = (value.remotes || []).find(item => item.direction === "fetch") || (value.remotes || [])[0];
+      remoteOriginNode.textContent = remote?.url || value.remoteError || "未配置远程仓库";
+      remoteBranchNode.textContent = value.currentBranch || value.branch || "未命名分支";
+      remoteSyncCopyNode.textContent = value.upstream
+        ? `跟踪 ${value.upstream} · 领先 ${value.ahead || 0} · 落后 ${value.behind || 0}`
+        : "当前分支尚未配置远程跟踪分支";
+      branchSelect.innerHTML = "";
+      (value.branches || []).forEach(branch => {
+        const option = document.createElement("option");
+        option.value = branch.name;
+        option.textContent = branch.name;
+        option.selected = Boolean(branch.current);
+        branchSelect.appendChild(option);
+      });
+      updateActions();
+    }
+
+    async function refreshRemote() {
+      if (!projectPath) { remoteSnapshot = null; renderRemote(); return; }
+      try {
+        remoteSnapshot = await api.getGitRemoteStatus();
+        renderRemote();
+      } catch (error) {
+        remoteSnapshot = { ok: false, isRepository: false, remoteError: cleanError(error) };
+        renderRemote();
+      }
+    }
+
+    async function remoteAction(label, action, confirmation) {
+      if (busy) return;
+      if (confirmation && !(await createDialog(confirmation))) return;
+      const result = await runAction(label, action);
+      if (result) {
+        remoteSnapshot = result.status || remoteSnapshot;
+        renderRemote();
+        notify(result.action === "push" ? "已推送到远程仓库" : result.action === "pull" ? "已拉取远程更新" : "已获取远程状态", "success", 8000);
+      }
     }
 
     function emptyMarkup(icon, message) {
@@ -1162,6 +1250,7 @@
       discardButton.hidden = activeTab !== "changes";
       commitButton.hidden = activeTab !== "changes";
       if (activeTab === "checkpoints") loadCheckpoints();
+      if (activeTab === "remote") refreshRemote();
       updateActions();
     }
 
@@ -1211,6 +1300,22 @@
       tab.addEventListener("click", () => switchTab(tab.dataset.tab));
     }
     refreshButton.addEventListener("click", () => refresh({ reloadCheckpoints: true }));
+    fetchButton.addEventListener("click", () => remoteAction("正在获取远程更新…", () => api.fetchGitRemote()));
+    pullButton.addEventListener("click", () => remoteAction("正在拉取远程更新…", () => api.pullGitRemote(), {
+      title: "拉取远程更新",
+      message: "将使用快进方式拉取当前分支的远程更新。工作区若有未提交修改，操作可能被 Git 拒绝。是否继续？",
+      confirmText: "确认拉取"
+    }));
+    pushButton.addEventListener("click", () => remoteAction("正在推送到远程仓库…", () => api.pushGitRemote(), {
+      title: "推送到远程仓库",
+      message: "将把当前分支已提交的内容推送到远程仓库。此操作会让远程仓库产生新的提交，是否继续？",
+      confirmText: "确认推送"
+    }));
+    switchBranchButton.addEventListener("click", () => remoteAction("正在切换 Git 分支…", () => api.switchGitBranch(branchSelect.value), {
+      title: "切换 Git 分支",
+      message: `将切换到分支“${branchSelect.value}”。当前项目必须没有未提交修改，是否继续？`,
+      confirmText: "确认切换"
+    }));
     selectAllNode.addEventListener("change", () => {
       selectedFiles = selectAllNode.checked
         ? new Set(files().map(item => item.path))
@@ -1289,9 +1394,11 @@
         refreshButton.classList.remove("spinning");
         projectPath = next;
         snapshot = null;
+        remoteSnapshot = null;
         currentFile = null;
         selectedFiles.clear();
         applyStatus(null);
+        renderRemote();
         if (projectPath) refresh();
       }
     };

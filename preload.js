@@ -89,6 +89,21 @@ contextBridge.exposeInMainWorld("deepseekCodex", {
   getGitStatus: () =>
     ipcRenderer.invoke("get-git-status"),
 
+  getGitRemoteStatus: () =>
+    ipcRenderer.invoke("get-git-remote-status"),
+
+  fetchGitRemote: () =>
+    ipcRenderer.invoke("git-fetch"),
+
+  pullGitRemote: () =>
+    ipcRenderer.invoke("git-pull"),
+
+  pushGitRemote: () =>
+    ipcRenderer.invoke("git-push"),
+
+  switchGitBranch: (branchName) =>
+    ipcRenderer.invoke("git-switch-branch", branchName),
+
   initializeGitRepository: () =>
     ipcRenderer.invoke("git-init-repository"),
 

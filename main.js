@@ -1749,7 +1749,7 @@ function installCodexCli() {
   });
 }
 
-function runGitCommand(projectPath, args) {
+function runGitCommand(projectPath, args, options = {}) {
   return new Promise((resolve, reject) => {
     execFile(
       "git",
@@ -1758,7 +1758,7 @@ function runGitCommand(projectPath, args) {
         cwd: projectPath,
         windowsHide: true,
         encoding: "utf8",
-        timeout: 10000,
+        timeout: options.timeout || 10000,
         maxBuffer: 2 * 1024 * 1024,
         env: {
           ...process.env,
@@ -1978,6 +1978,42 @@ function requireCurrentGitProject() {
     throw new Error("请先选择项目文件夹");
   }
   return projectPath;
+}
+
+async function getGitRemoteStatus(projectPath) {
+  const status = await getGitStatus(projectPath);
+  if (!status.ok || !status.isRepository) return status;
+
+  try {
+    const [remoteOutput, branchOutput] = await Promise.all([
+      runGitCommand(projectPath, ["remote", "-v"]),
+      runGitCommand(projectPath, ["branch", "--format=%(refname:short)%09%(upstream:short)%09%(HEAD)"])
+    ]);
+    const remotes = remoteOutput.split(/\r?\n/).filter(Boolean).map(line => {
+      const match = line.match(/^(.+?)\s+(\S+)\s+\((fetch|push)\)$/);
+      return match ? { name: match[1], url: match[2], direction: match[3] } : null;
+    }).filter(Boolean);
+    const branches = branchOutput.split(/\r?\n/).filter(Boolean).map(line => {
+      const [name, upstream, head] = line.split("\t");
+      return { name, upstream: upstream || null, current: head === "*" };
+    });
+    return { ...status, remotes, branches, currentBranch: status.branch || null };
+  } catch (error) {
+    return { ...status, remotes: [], branches: [], currentBranch: status.branch || null, remoteError: error?.stderr?.trim() || error?.message || "读取远程状态失败" };
+  }
+}
+
+async function runGitRemoteAction(action, args, options = {}) {
+  const projectPath = requireCurrentGitProject();
+  const before = await getGitStatus(projectPath);
+  if (!before.ok || !before.isRepository) throw new Error(before.message || "当前项目不是 Git 仓库");
+  const output = await runGitCommand(projectPath, args, options);
+  return {
+    ok: true,
+    action,
+    output: String(output || "").trim(),
+    status: await getGitRemoteStatus(projectPath)
+  };
 }
 
 async function withFreshGitStatus(result = {}) {
@@ -2807,6 +2843,46 @@ ipcMain.handle(
 ipcMain.handle(
   "get-git-status",
   () => getGitStatus(agentState.projectPath)
+);
+
+ipcMain.handle(
+  "get-git-remote-status",
+  () => getGitRemoteStatus(agentState.projectPath)
+);
+
+ipcMain.handle(
+  "git-fetch",
+  () => runGitRemoteAction("fetch", ["fetch", "--prune"], { timeout: 120000 })
+);
+
+ipcMain.handle(
+  "git-pull",
+  async () => {
+    const status = await getGitStatus(requireCurrentGitProject());
+    if (status.summary?.conflicts) throw new Error("当前项目已有冲突，请先解决冲突后再拉取");
+    return runGitRemoteAction("pull", ["pull", "--ff-only"], { timeout: 120000 });
+  }
+);
+
+ipcMain.handle(
+  "git-push",
+  async () => {
+    const status = await getGitStatus(requireCurrentGitProject());
+    if (!status.upstream) throw new Error("当前分支还没有配置远程跟踪分支，请先在 GitHub Desktop 中发布分支");
+    return runGitRemoteAction("push", ["push"], { timeout: 120000 });
+  }
+);
+
+ipcMain.handle(
+  "git-switch-branch",
+  async (_event, branchName) => {
+    const projectPath = requireCurrentGitProject();
+    const status = await getGitStatus(projectPath);
+    if (status.summary?.changed) throw new Error("当前项目有未提交修改，请先提交或创建安全存档后再切换分支");
+    const branch = String(branchName || "").trim();
+    if (!/^[A-Za-z0-9._\/-]+$/.test(branch)) throw new Error("分支名称无效");
+    return runGitRemoteAction("switch", ["switch", branch], { timeout: 30000 });
+  }
 );
 
 ipcMain.handle(
