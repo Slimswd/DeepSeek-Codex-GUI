@@ -81,6 +81,36 @@ contextBridge.exposeInMainWorld("deepseekCodex", {
   getGitStatus: () =>
     ipcRenderer.invoke("get-git-status"),
 
+  initializeGitRepository: () =>
+    ipcRenderer.invoke("git-init-repository"),
+
+  getGitFileDiff: (filePath) =>
+    ipcRenderer.invoke("get-git-file-diff", filePath),
+
+  stageGitFiles: (filePaths) =>
+    ipcRenderer.invoke("git-stage-files", filePaths),
+
+  unstageGitFiles: (filePaths) =>
+    ipcRenderer.invoke("git-unstage-files", filePaths),
+
+  createGitCheckpoint: (label) =>
+    ipcRenderer.invoke("git-create-checkpoint", label),
+
+  listGitCheckpoints: () =>
+    ipcRenderer.invoke("git-list-checkpoints"),
+
+  restoreGitCheckpoint: (checkpointId) =>
+    ipcRenderer.invoke(
+      "git-restore-checkpoint",
+      checkpointId
+    ),
+
+  discardGitFiles: (filePaths) =>
+    ipcRenderer.invoke("git-discard-files", filePaths),
+
+  commitStagedGitChanges: (message) =>
+    ipcRenderer.invoke("git-commit-staged", message),
+
   getDiagnostics: () =>
     ipcRenderer.invoke("get-diagnostics"),
 

@@ -9,6 +9,7 @@ const https = require("https");
 const readline = require("readline");
 const recentProjects = require("./recent-projects");
 const threadHistory = require("./thread-history");
+const gitReview = require("./git-review-manager");
 const {
   ACTIVE_STATUSES,
   TaskRuntimeManager
@@ -1787,30 +1788,87 @@ function runGitCommand(projectPath, args) {
 }
 
 function parseGitStatusOutput(output) {
-  const lines = String(output || "")
-    .split(/\r?\n/)
-    .filter(Boolean);
-  const branchLine = lines.shift() || "";
+  const value = String(output || "");
+  let branchLine = "";
+  const records = [];
+
+  if (value.includes("\0")) {
+    const tokens = value.split("\0");
+    if (!tokens.at(-1)) tokens.pop();
+    if (tokens[0]?.startsWith("## ")) {
+      branchLine = tokens.shift();
+    }
+
+    for (let index = 0; index < tokens.length; index += 1) {
+      const token = tokens[index];
+      if (token.length < 3) continue;
+      const code = token.slice(0, 2);
+      const filePath = token.slice(3);
+      const hasSecondPath =
+        code.includes("R") || code.includes("C");
+      const originalPath = hasSecondPath
+        ? tokens[index + 1] || null
+        : null;
+      if (hasSecondPath) index += 1;
+      records.push({ code, filePath, originalPath });
+    }
+  } else {
+    const lines = value
+      .split(/\r?\n/)
+      .filter(Boolean);
+    if (lines[0]?.startsWith("## ")) {
+      branchLine = lines.shift();
+    }
+
+    for (const line of lines) {
+      if (line.length < 3) continue;
+      const code = line.slice(0, 2);
+      const rawPath = line.slice(3);
+      const renameSeparator = " -> ";
+      const renameIndex = rawPath.lastIndexOf(renameSeparator);
+      records.push({
+        code,
+        originalPath:
+          renameIndex >= 0
+            ? rawPath.slice(0, renameIndex)
+            : null,
+        filePath:
+          renameIndex >= 0
+            ? rawPath.slice(renameIndex + renameSeparator.length)
+            : rawPath
+      });
+    }
+  }
+
   const files = [];
 
-  for (const line of lines) {
-    if (line.length < 3) continue;
-
-    const code = line.slice(0, 2);
-    const filePath = line.slice(3);
+  for (const record of records) {
+    const { code, filePath, originalPath } = record;
+    const hasStaged =
+      code[0] !== " " && code[0] !== "?";
+    const hasWorktree =
+      code[1] !== " " && code[1] !== "?";
+    const isConflict =
+      code.includes("U") ||
+      ["DD", "AA"].includes(code);
 
     files.push({
       code,
       index: code[0] || " ",
       worktree: code[1] || " ",
       path: filePath,
+      originalPath,
+      hasStaged,
+      hasWorktree,
+      isNew: code === "??" || code[0] === "A",
+      isRenamed:
+        code.includes("R") || code.includes("C"),
       kind:
         code === "??"
           ? "untracked"
-          : code.includes("U") ||
-              ["DD", "AA"].includes(code)
+          : isConflict
             ? "conflict"
-            : code[0] !== " "
+            : hasStaged
               ? "staged"
               : "modified"
     });
@@ -1853,8 +1911,8 @@ function parseGitStatusOutput(output) {
     files,
     summary: {
       changed: files.length,
-      staged: files.filter(item => item.kind === "staged").length,
-      modified: files.filter(item => item.kind === "modified").length,
+      staged: files.filter(item => item.hasStaged).length,
+      modified: files.filter(item => item.hasWorktree).length,
       untracked: files.filter(item => item.kind === "untracked").length,
       conflicts: files.filter(item => item.kind === "conflict").length
     }
@@ -1878,6 +1936,7 @@ async function getGitStatus(projectPath) {
         "core.quotepath=false",
         "status",
         "--porcelain=v1",
+        "-z",
         "--branch",
         "--untracked-files=all"
       ]),
@@ -1918,6 +1977,99 @@ async function getGitStatus(projectPath) {
       message
     };
   }
+}
+
+function requireCurrentGitProject() {
+  const projectPath = agentState.projectPath;
+  if (!projectPath || !fs.existsSync(projectPath)) {
+    throw new Error("请先选择项目文件夹");
+  }
+  return projectPath;
+}
+
+async function withFreshGitStatus(result = {}) {
+  return {
+    ...result,
+    status: await getGitStatus(
+      requireCurrentGitProject()
+    )
+  };
+}
+
+async function discardGitFilesSafely(filePaths) {
+  const projectPath = requireCurrentGitProject();
+  const snapshot = await getGitStatus(projectPath);
+  if (!snapshot.ok || !snapshot.isRepository) {
+    throw new Error(
+      snapshot.message || "当前项目不是 Git 仓库"
+    );
+  }
+
+  const requested = new Set(
+    (Array.isArray(filePaths) ? filePaths : []).map(String)
+  );
+  const selected = snapshot.files.filter(item =>
+    requested.has(item.path)
+  );
+
+  if (!selected.length) {
+    throw new Error("请至少选择一个仍有改动的文件");
+  }
+
+  if (
+    selected.some(
+      item => item.kind === "conflict" || item.isRenamed
+    )
+  ) {
+    throw new Error(
+      "重命名或冲突文件不能单独撤销，请先解决冲突，或使用存档点恢复整个项目。"
+    );
+  }
+
+  const safetyCheckpoint = await gitReview.createCheckpoint(
+    projectPath,
+    `撤销 ${selected.length} 个文件前自动保护`
+  );
+  const newFiles = selected.filter(item => item.isNew);
+  const trackedFiles = selected.filter(item => !item.isNew);
+
+  if (trackedFiles.length) {
+    await gitReview.restoreFilesToHead(
+      projectPath,
+      trackedFiles.map(item => item.path),
+      { createSafety: false }
+    );
+  }
+
+  if (newFiles.some(item => item.hasStaged)) {
+    await gitReview.unstageFiles(
+      projectPath,
+      newFiles
+        .filter(item => item.hasStaged)
+        .map(item => item.path)
+    );
+  }
+
+  const recycled = [];
+  for (const item of newFiles) {
+    const normalized = gitReview.normalizeRepositoryPath(
+      snapshot.repositoryRoot,
+      item.path
+    );
+    if (fs.existsSync(normalized.absolutePath)) {
+      await shell.trashItem(normalized.absolutePath);
+      recycled.push(item.path);
+    }
+  }
+
+  return withFreshGitStatus({
+    ok: true,
+    restored: trackedFiles.map(item => item.path),
+    recycled,
+    safetyCheckpoint,
+    message:
+      "所选改动已撤销；撤销前状态已保存为存档点，新文件已移入回收站。"
+  });
 }
 
 async function resumeCurrentThreadAfterReconnect() {
@@ -2662,6 +2814,101 @@ ipcMain.handle(
 ipcMain.handle(
   "get-git-status",
   () => getGitStatus(agentState.projectPath)
+);
+
+ipcMain.handle(
+  "git-init-repository",
+  async () => {
+    const projectPath = agentState.projectPath;
+    if (!projectPath || !fs.existsSync(projectPath)) {
+      return { ok: false, message: "请先选择项目文件夹" };
+    }
+    try {
+      await runGitCommand(projectPath, ["init"]);
+      return { ok: true, message: "已初始化 Git 仓库", status: await getGitStatus(projectPath) };
+    } catch (error) {
+      return { ok: false, message: error?.code === "ENOENT" ? "系统未找到 Git，请先安装 Git" : error?.stderr?.trim() || error?.message || "初始化 Git 失败" };
+    }
+  }
+);
+
+ipcMain.handle(
+  "get-git-file-diff",
+  (_event, filePath) =>
+    gitReview.getFileDiff(
+      requireCurrentGitProject(),
+      filePath
+    )
+);
+
+ipcMain.handle(
+  "git-stage-files",
+  async (_event, filePaths) =>
+    withFreshGitStatus(
+      await gitReview.stageFiles(
+        requireCurrentGitProject(),
+        filePaths
+      )
+    )
+);
+
+ipcMain.handle(
+  "git-unstage-files",
+  async (_event, filePaths) =>
+    withFreshGitStatus(
+      await gitReview.unstageFiles(
+        requireCurrentGitProject(),
+        filePaths
+      )
+    )
+);
+
+ipcMain.handle(
+  "git-create-checkpoint",
+  async (_event, label) =>
+    withFreshGitStatus({
+      ok: true,
+      checkpoint: await gitReview.createCheckpoint(
+        requireCurrentGitProject(),
+        label
+      )
+    })
+);
+
+ipcMain.handle(
+  "git-list-checkpoints",
+  () =>
+    gitReview.listCheckpoints(
+      requireCurrentGitProject()
+    )
+);
+
+ipcMain.handle(
+  "git-restore-checkpoint",
+  async (_event, checkpointId) =>
+    withFreshGitStatus(
+      await gitReview.restoreCheckpoint(
+        requireCurrentGitProject(),
+        checkpointId
+      )
+    )
+);
+
+ipcMain.handle(
+  "git-discard-files",
+  (_event, filePaths) =>
+    discardGitFilesSafely(filePaths)
+);
+
+ipcMain.handle(
+  "git-commit-staged",
+  async (_event, message) =>
+    withFreshGitStatus(
+      await gitReview.commitStaged(
+        requireCurrentGitProject(),
+        message
+      )
+    )
 );
 
 ipcMain.handle(
