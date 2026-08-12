@@ -28,6 +28,9 @@ const updateDialogVersion = document.querySelector(".update-dialog-version");
 const updateDialogPrimary = document.querySelector(".update-dialog-primary");
 const updateDialogLater = document.querySelector(".update-dialog-later");
 const updateProgressPercent = updateProgressToast?.querySelector("strong");
+const updateProgressSpeed = updateProgressToast?.querySelector(".update-progress-speed");
+const updateProgressEta = updateProgressToast?.querySelector(".update-progress-eta");
+let updateDownloadSample = null;
 const sideTaskOverview = document.querySelector(".side-task-overview");
 const sideTaskStatus = document.querySelector(".side-task-status");
 const sideTaskSteps = document.querySelector(".side-task-steps");
@@ -279,6 +282,30 @@ function closeUpdateDialog() {
   if (updateDialog) updateDialog.hidden = true;
 }
 
+function formatUpdateBytes(bytes) {
+  const value = Number(bytes);
+  if (!Number.isFinite(value) || value < 0) return "";
+  const units = ["B", "KB", "MB", "GB"];
+  let index = 0;
+  let normalized = value;
+  while (normalized >= 1024 && index < units.length - 1) {
+    normalized /= 1024;
+    index += 1;
+  }
+  const precision = normalized >= 100 || index === 0 ? 0 : 1;
+  return `${normalized.toFixed(precision)} ${units[index]}`;
+}
+
+function formatUpdateRemainingTime(seconds) {
+  const value = Math.max(0, Math.round(Number(seconds)));
+  if (!Number.isFinite(value)) return "正在计算时间";
+  if (value < 60) return `约 ${value} 秒剩余`;
+  const minutes = Math.floor(value / 60);
+  const remainSeconds = value % 60;
+  if (minutes < 60) return `约 ${minutes} 分 ${remainSeconds} 秒剩余`;
+  return `约 ${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分剩余`;
+}
+
 window.deepseekCodex.onUpdateAvailable?.((data) => {
   if (!updateDialog) return;
   updateDialog.dataset.state = "available";
@@ -304,12 +331,17 @@ updateDialogPrimary?.addEventListener("click", async () => {
   }
   if (updateProgressBar) updateProgressBar.style.width = "0%";
   if (updateProgressPercent) updateProgressPercent.textContent = "0%";
+  if (updateProgressSpeed) updateProgressSpeed.textContent = "正在连接…";
+  if (updateProgressEta) updateProgressEta.textContent = "正在计算时间";
+  updateDownloadSample = null;
   const result = await window.deepseekCodex.downloadUpdate?.();
   if (!result?.ok) {
     updateDialogPrimary.disabled = false;
     updateDialogPrimary.innerHTML = '<i class="ph ph-download-simple"></i> 重新下载';
     if (updateProgressToast) {
       updateProgressToast.querySelector("span").textContent = "更新下载失败，请稍后重试";
+      if (updateProgressSpeed) updateProgressSpeed.textContent = "下载未完成";
+      if (updateProgressEta) updateProgressEta.textContent = "可稍后重新下载";
       setTimeout(() => { updateProgressToast.hidden = true; }, 5000);
     }
     return;
@@ -321,6 +353,8 @@ window.deepseekCodex.onUpdateDownloadError?.(() => {
   updateProgressToast.hidden = false;
   updateProgressToast.querySelector("span").textContent = "更新下载失败，请稍后重试";
   if (updateProgressPercent) updateProgressPercent.textContent = "!";
+  if (updateProgressSpeed) updateProgressSpeed.textContent = "下载未完成";
+  if (updateProgressEta) updateProgressEta.textContent = "可稍后重新下载";
   setTimeout(() => { updateProgressToast.hidden = true; }, 5000);
 });
 
@@ -328,8 +362,36 @@ window.deepseekCodex.onUpdateDownloadProgress?.((data) => {
   if (!updateProgressToast) return;
   updateProgressToast.hidden = false;
   const percent = Number(data?.percent || 0);
+  const transferred = Number(data?.transferred);
+  const total = Number(data?.total);
+  const reportedSpeed = Number(data?.bytesPerSecond);
+  const now = Date.now();
+  let bytesPerSecond = Number.isFinite(reportedSpeed) && reportedSpeed > 0 ? reportedSpeed : 0;
+  if (!bytesPerSecond && Number.isFinite(transferred) && updateDownloadSample) {
+    const elapsedSeconds = (now - updateDownloadSample.at) / 1000;
+    const deltaBytes = transferred - updateDownloadSample.transferred;
+    if (elapsedSeconds > 0.2 && deltaBytes > 0) bytesPerSecond = deltaBytes / elapsedSeconds;
+  }
+  if (Number.isFinite(transferred)) updateDownloadSample = { transferred, at: now };
   if (updateProgressBar) updateProgressBar.style.width = `${percent}%`;
   if (updateProgressPercent) updateProgressPercent.textContent = `${percent}%`;
+  if (data?.completed) {
+    if (updateProgressSpeed) updateProgressSpeed.textContent = "下载完成";
+    if (updateProgressEta) updateProgressEta.textContent = "正在安装更新";
+  } else {
+    if (updateProgressSpeed) {
+      updateProgressSpeed.textContent = bytesPerSecond > 0
+        ? `${formatUpdateBytes(bytesPerSecond)}/s`
+        : "正在计算速度";
+    }
+    if (updateProgressEta) {
+      updateProgressEta.textContent = total > 0 && bytesPerSecond > 0
+        ? formatUpdateRemainingTime((total - (Number.isFinite(transferred) ? transferred : 0)) / bytesPerSecond)
+        : total > 0 && Number.isFinite(transferred)
+          ? `${formatUpdateBytes(transferred)} / ${formatUpdateBytes(total)}`
+          : "正在计算时间";
+    }
+  }
   if (data?.completed) {
     updateProgressToast.querySelector("span").textContent = "更新下载完成，正在自动重启";
   }

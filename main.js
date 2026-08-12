@@ -74,7 +74,8 @@ function setupAutoUpdater() {
     mainWindow?.webContents.send("update-download-progress", {
       percent: Math.max(0, Math.min(100, Math.round(progress.percent))),
       transferred: progress.transferred,
-      total: progress.total
+      total: progress.total,
+      bytesPerSecond: progress.bytesPerSecond
     });
   });
 
