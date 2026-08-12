@@ -62,7 +62,7 @@ jobs:
           $version = "${{ github.ref_name }}".TrimStart("v")
           $content = Get-Content -LiteralPath "CHANGELOG.md" -Raw
           $escapedVersion = [regex]::Escape($version)
-          $match = [regex]::Match($content, "(?ms)^##\\s+$escapedVersion\\b.*?(?=^##\\s+|\\z)")
+          $match = [regex]::Match($content, "(?ms)^##\s+$escapedVersion\b.*?(?=^##\s+|\z)")
           if (-not $match.Success) { throw "No CHANGELOG.md entry found for version $version" }
           Set-Content -LiteralPath "release-notes.md" -Value $match.Value.Trim() -Encoding utf8
 
