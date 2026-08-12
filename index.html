@@ -159,6 +159,13 @@ body {
 .update-progress-bar { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #f47721, #ffc26e); transition: width .2s ease; }
 .update-progress-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; color: #8493a2; font-size: 11px; font-variant-numeric: tabular-nums; }
 .update-progress-meta span:last-child { margin-left: auto; text-align: right; }
+.update-progress-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.update-progress-actions[hidden] { display: none; }
+.update-progress-actions button { min-height: 29px; padding: 0 11px; border: 1px solid #344454; border-radius: 999px; background: transparent; color: #b8c5d1; font: inherit; font-size: 11px; cursor: pointer; }
+.update-progress-actions button:hover { border-color: #526477; color: #fff; }
+.update-progress-actions .update-install-now { border-color: #f47721; background: rgba(244,119,33,.12); color: #ffac69; }
+.update-progress-actions .update-install-now:hover { background: #e86f1b; color: #fff; }
+.update-progress-actions button:disabled { opacity: .6; cursor: wait; }
 
 .project-name {
   font-weight: 600;
@@ -577,6 +584,7 @@ textarea {
   <div class="update-progress-title"><i class="ph ph-download-simple"></i><span>正在下载更新</span><strong>0%</strong></div>
   <div class="update-progress-track"><div class="update-progress-bar"></div></div>
   <div class="update-progress-meta"><span class="update-progress-speed">正在连接…</span><span class="update-progress-eta">正在计算时间</span></div>
+  <div class="update-progress-actions" hidden><button class="update-install-later" type="button">稍后</button><button class="update-install-now" type="button"><i class="ph ph-arrow-clockwise"></i> 立即安装</button></div>
 </div>
 
 <div class="update-dialog-overlay" hidden>
@@ -585,7 +593,7 @@ textarea {
       <div class="update-dialog-icon"><i class="ph ph-arrow-circle-down"></i></div>
       <div class="update-dialog-heading"><div class="update-dialog-kicker">DEEPSEEK CODEX · UPDATE</div><h2 id="update-dialog-title">发现新版本</h2></div>
     </div>
-    <div class="update-dialog-body"><p class="update-dialog-version"></p><p class="update-dialog-copy">点击下载后将返回主界面，完成后应用会自动重启并安装更新。</p></div>
+    <div class="update-dialog-body"><p class="update-dialog-version"></p><p class="update-dialog-copy">点击下载后将返回主界面；下载完成后可由你选择何时安装。</p></div>
     <div class="update-dialog-actions"><button class="update-dialog-later" type="button">稍后提醒</button><button class="update-dialog-primary" type="button"><i class="ph ph-download-simple"></i> 下载更新</button></div>
   </section>
 </div>

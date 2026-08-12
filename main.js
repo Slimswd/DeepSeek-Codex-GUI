@@ -34,16 +34,17 @@ let shuttingDown = false;
 const WINDOW_STATE_FILE = "window-state.json";
 let updatePromptShown = false;
 let updateDownloadInProgress = false;
-let updateInstallScheduled = false;
+let updateReadyToInstall = false;
+let updateInstallInProgress = false;
 
 function setupAutoUpdater() {
   if (!app.isPackaged) return;
 
   autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoInstallOnAppQuit = false;
 
   autoUpdater.on("update-available", async (info) => {
-    if (updatePromptShown || updateDownloadInProgress || updateInstallScheduled) return;
+    if (updatePromptShown || updateDownloadInProgress || updateReadyToInstall || updateInstallInProgress) return;
     updatePromptShown = true;
     mainWindow?.webContents.send("update-available", {
       version: info.version,
@@ -54,20 +55,9 @@ function setupAutoUpdater() {
 
   autoUpdater.on("update-downloaded", async () => {
     updateDownloadInProgress = false;
+    updateReadyToInstall = true;
     mainWindow?.webContents.send("update-download-progress", { percent: 100, completed: true });
-    if (updateInstallScheduled) return;
-
-    updateInstallScheduled = true;
-    setTimeout(() => {
-      try {
-        autoUpdater.quitAndInstall(true, true);
-      } catch (error) {
-        updateInstallScheduled = false;
-        mainWindow?.webContents.send("update-download-error", {
-          message: error?.message || "更新安装启动失败"
-        });
-      }
-    }, 900);
+    mainWindow?.webContents.send("update-ready");
   });
 
   autoUpdater.on("download-progress", (progress) => {
@@ -80,13 +70,13 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on("error", (error) => {
-    if (updateDownloadInProgress || updateInstallScheduled) {
+    if (updateDownloadInProgress || updateInstallInProgress) {
       mainWindow?.webContents.send("update-download-error", {
         message: error?.message || "更新下载失败"
       });
     }
     updateDownloadInProgress = false;
-    updateInstallScheduled = false;
+    updateInstallInProgress = false;
   });
 
   setTimeout(() => {
@@ -97,6 +87,9 @@ function setupAutoUpdater() {
 }
 
 ipcMain.handle("download-update", async () => {
+  if (updateReadyToInstall) {
+    return { ok: true, ready: true };
+  }
   if (updateDownloadInProgress) {
     return { ok: true, inProgress: true };
   }
@@ -108,6 +101,21 @@ ipcMain.handle("download-update", async () => {
   } catch (error) {
     updateDownloadInProgress = false;
     return { ok: false, message: error?.message || "更新下载失败" };
+  }
+});
+
+ipcMain.handle("install-downloaded-update", () => {
+  if (!updateReadyToInstall || updateInstallInProgress) {
+    return { ok: false, message: "更新尚未准备完成" };
+  }
+
+  updateInstallInProgress = true;
+  try {
+    autoUpdater.quitAndInstall(true, true);
+    return { ok: true };
+  } catch (error) {
+    updateInstallInProgress = false;
+    return { ok: false, message: error?.message || "更新安装启动失败" };
   }
 });
 
@@ -3756,6 +3764,11 @@ ipcMain.handle("check-for-updates", async () => {
       detail: "请使用已安装的正式版本进行更新测试。"
     });
     return { ok: true, development: true };
+  }
+
+  if (updateReadyToInstall) {
+    mainWindow?.webContents.send("update-ready");
+    return { ok: true, ready: true };
   }
 
   try {

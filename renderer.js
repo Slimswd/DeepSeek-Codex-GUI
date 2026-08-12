@@ -30,6 +30,9 @@ const updateDialogLater = document.querySelector(".update-dialog-later");
 const updateProgressPercent = updateProgressToast?.querySelector("strong");
 const updateProgressSpeed = updateProgressToast?.querySelector(".update-progress-speed");
 const updateProgressEta = updateProgressToast?.querySelector(".update-progress-eta");
+const updateProgressActions = updateProgressToast?.querySelector(".update-progress-actions");
+const updateInstallLater = updateProgressToast?.querySelector(".update-install-later");
+const updateInstallNow = updateProgressToast?.querySelector(".update-install-now");
 let updateDownloadSample = null;
 const sideTaskOverview = document.querySelector(".side-task-overview");
 const sideTaskStatus = document.querySelector(".side-task-status");
@@ -313,7 +316,7 @@ window.deepseekCodex.onUpdateAvailable?.((data) => {
   updateDialog.querySelector(".update-dialog-kicker").textContent = "DEEPSEEK CODEX · UPDATE";
   updateDialog.querySelector("#update-dialog-title").textContent = "发现新版本";
   updateDialogVersion.innerHTML = `<span class="update-version-old">v${data?.currentVersion || "--"}</span><i class="ph ph-arrow-right update-version-arrow"></i><span class="update-version-new">v${data?.version || "--"}</span>`;
-  updateDialog.querySelector(".update-dialog-copy").textContent = "点击下载后将返回主界面，完成后应用会自动重启并安装更新。";
+  updateDialog.querySelector(".update-dialog-copy").textContent = "点击下载后将返回主界面；下载完成后可由你选择何时安装。";
   updateDialogPrimary.disabled = false;
   updateDialogPrimary.innerHTML = '<i class="ph ph-download-simple"></i> 下载更新';
   updateDialog.hidden = false;
@@ -333,6 +336,7 @@ updateDialogPrimary?.addEventListener("click", async () => {
   if (updateProgressPercent) updateProgressPercent.textContent = "0%";
   if (updateProgressSpeed) updateProgressSpeed.textContent = "正在连接…";
   if (updateProgressEta) updateProgressEta.textContent = "正在计算时间";
+  if (updateProgressActions) updateProgressActions.hidden = true;
   updateDownloadSample = null;
   const result = await window.deepseekCodex.downloadUpdate?.();
   if (!result?.ok) {
@@ -355,7 +359,34 @@ window.deepseekCodex.onUpdateDownloadError?.(() => {
   if (updateProgressPercent) updateProgressPercent.textContent = "!";
   if (updateProgressSpeed) updateProgressSpeed.textContent = "下载未完成";
   if (updateProgressEta) updateProgressEta.textContent = "可稍后重新下载";
+  if (updateProgressActions) updateProgressActions.hidden = true;
   setTimeout(() => { updateProgressToast.hidden = true; }, 5000);
+});
+
+window.deepseekCodex.onUpdateReady?.(() => {
+  if (!updateProgressToast) return;
+  updateProgressToast.hidden = false;
+  updateProgressToast.querySelector("span").textContent = "更新已下载完成";
+  if (updateProgressPercent) updateProgressPercent.textContent = "100%";
+  if (updateProgressSpeed) updateProgressSpeed.textContent = "已下载到本机";
+  if (updateProgressEta) updateProgressEta.textContent = "请选择何时安装";
+  if (updateProgressActions) updateProgressActions.hidden = false;
+});
+
+updateInstallLater?.addEventListener("click", () => {
+  if (updateProgressToast) updateProgressToast.hidden = true;
+});
+
+updateInstallNow?.addEventListener("click", async () => {
+  if (!updateInstallNow) return;
+  updateInstallNow.disabled = true;
+  updateInstallNow.innerHTML = '<i class="ph ph-spinner-gap"></i> 正在启动安装';
+  const result = await window.deepseekCodex.installDownloadedUpdate?.();
+  if (!result?.ok) {
+    updateInstallNow.disabled = false;
+    updateInstallNow.innerHTML = '<i class="ph ph-arrow-clockwise"></i> 重新安装';
+    if (updateProgressEta) updateProgressEta.textContent = result?.message || "安装启动失败";
+  }
 });
 
 window.deepseekCodex.onUpdateDownloadProgress?.((data) => {
@@ -377,7 +408,7 @@ window.deepseekCodex.onUpdateDownloadProgress?.((data) => {
   if (updateProgressPercent) updateProgressPercent.textContent = `${percent}%`;
   if (data?.completed) {
     if (updateProgressSpeed) updateProgressSpeed.textContent = "下载完成";
-    if (updateProgressEta) updateProgressEta.textContent = "正在安装更新";
+    if (updateProgressEta) updateProgressEta.textContent = "正在准备安装选项";
   } else {
     if (updateProgressSpeed) {
       updateProgressSpeed.textContent = bytesPerSecond > 0
@@ -393,7 +424,7 @@ window.deepseekCodex.onUpdateDownloadProgress?.((data) => {
     }
   }
   if (data?.completed) {
-    updateProgressToast.querySelector("span").textContent = "更新下载完成，正在自动重启";
+    updateProgressToast.querySelector("span").textContent = "更新下载完成";
   }
 });
 
