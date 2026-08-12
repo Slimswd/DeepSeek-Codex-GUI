@@ -36,6 +36,68 @@ let updatePromptShown = false;
 let updateDownloadInProgress = false;
 let updateReadyToInstall = false;
 let updateInstallInProgress = false;
+let updateInstallRequested = false;
+
+function getPendingUpdateTaskState() {
+  return {
+    activeTaskCount: taskRuntime.activeCount(),
+    queuedTaskCount: taskRuntime.queuedCount()
+  };
+}
+
+function hasPendingUpdateTasks() {
+  const state = getPendingUpdateTaskState();
+  return state.activeTaskCount > 0 || state.queuedTaskCount > 0;
+}
+
+function sendUpdateInstallDeferred() {
+  const state = getPendingUpdateTaskState();
+  sendToRenderer("update-install-deferred", state);
+  return state;
+}
+
+function beginDownloadedUpdateInstall() {
+  if (!updateReadyToInstall || updateInstallInProgress) {
+    return { ok: false, message: "更新尚未准备完成" };
+  }
+
+  if (hasPendingUpdateTasks()) {
+    updateInstallRequested = true;
+    return { ok: true, deferred: true, ...sendUpdateInstallDeferred() };
+  }
+
+  updateInstallRequested = false;
+  updateInstallInProgress = true;
+  try {
+    autoUpdater.quitAndInstall(true, true);
+    return { ok: true };
+  } catch (error) {
+    updateInstallInProgress = false;
+    return { ok: false, message: error?.message || "更新安装启动失败" };
+  }
+}
+
+function installUpdateWhenTasksFinish() {
+  if (
+    !updateInstallRequested ||
+    !updateReadyToInstall ||
+    updateInstallInProgress ||
+    hasPendingUpdateTasks()
+  ) {
+    return;
+  }
+
+  updateInstallRequested = false;
+  updateInstallInProgress = true;
+  try {
+    autoUpdater.quitAndInstall(true, true);
+  } catch (error) {
+    updateInstallInProgress = false;
+    mainWindow?.webContents.send("update-download-error", {
+      message: error?.message || "更新安装启动失败"
+    });
+  }
+}
 
 function setupAutoUpdater() {
   if (!app.isPackaged) return;
@@ -77,6 +139,7 @@ function setupAutoUpdater() {
     }
     updateDownloadInProgress = false;
     updateInstallInProgress = false;
+    updateInstallRequested = false;
   });
 
   setTimeout(() => {
@@ -105,18 +168,7 @@ ipcMain.handle("download-update", async () => {
 });
 
 ipcMain.handle("install-downloaded-update", () => {
-  if (!updateReadyToInstall || updateInstallInProgress) {
-    return { ok: false, message: "更新尚未准备完成" };
-  }
-
-  updateInstallInProgress = true;
-  try {
-    autoUpdater.quitAndInstall(true, true);
-    return { ok: true };
-  } catch (error) {
-    updateInstallInProgress = false;
-    return { ok: false, message: error?.message || "更新安装启动失败" };
-  }
+  return beginDownloadedUpdateInstall();
 });
 
 function getWindowStatePath() {
@@ -878,6 +930,7 @@ function sendTaskState(threadId) {
     queuedTaskCount: taskRuntime.queuedCount()
   });
   sendTaskList();
+  installUpdateWhenTasksFinish();
 }
 
 function emitTaskEvent(channel, threadId, data = {}) {

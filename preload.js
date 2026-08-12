@@ -85,6 +85,9 @@ contextBridge.exposeInMainWorld("deepseekCodex", {
   onUpdateReady: (callback) => {
     ipcRenderer.on("update-ready", () => callback());
   },
+  onUpdateInstallDeferred: (callback) => {
+    ipcRenderer.on("update-install-deferred", (_event, data) => callback(data));
+  },
   onUpdateDownloadError: (callback) => {
     ipcRenderer.on("update-download-error", (_event, data) => callback(data));
   },

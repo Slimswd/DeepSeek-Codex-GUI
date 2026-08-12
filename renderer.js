@@ -373,6 +373,23 @@ window.deepseekCodex.onUpdateReady?.(() => {
   if (updateProgressActions) updateProgressActions.hidden = false;
 });
 
+window.deepseekCodex.onUpdateInstallDeferred?.((data) => {
+  if (!updateProgressToast) return;
+  const activeTaskCount = Number(data?.activeTaskCount || 0);
+  const queuedTaskCount = Number(data?.queuedTaskCount || 0);
+  const pendingCount = activeTaskCount + queuedTaskCount;
+  updateProgressToast.hidden = false;
+  updateProgressToast.querySelector("span").textContent = "任务执行中，更新已暂缓";
+  if (updateProgressPercent) updateProgressPercent.textContent = "100%";
+  if (updateProgressSpeed) updateProgressSpeed.textContent = "更新已下载完成";
+  if (updateProgressEta) {
+    updateProgressEta.textContent = pendingCount > 0
+      ? `等待 ${pendingCount} 个任务结束后安装`
+      : "等待当前任务结束后安装";
+  }
+  if (updateProgressActions) updateProgressActions.hidden = true;
+});
+
 updateInstallLater?.addEventListener("click", () => {
   if (updateProgressToast) updateProgressToast.hidden = true;
 });
@@ -382,6 +399,9 @@ updateInstallNow?.addEventListener("click", async () => {
   updateInstallNow.disabled = true;
   updateInstallNow.innerHTML = '<i class="ph ph-spinner-gap"></i> 正在启动安装';
   const result = await window.deepseekCodex.installDownloadedUpdate?.();
+  if (result?.deferred) {
+    return;
+  }
   if (!result?.ok) {
     updateInstallNow.disabled = false;
     updateInstallNow.innerHTML = '<i class="ph ph-arrow-clockwise"></i> 重新安装';
