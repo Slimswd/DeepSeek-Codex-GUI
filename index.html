@@ -152,11 +152,6 @@ body {
 .update-dialog-actions .update-dialog-primary { border-color: #f47721; background: rgba(244,119,33,.12); color: #ffac69; box-shadow: 0 0 16px rgba(244,119,33,.08); }
 .update-dialog-actions .update-dialog-primary:hover { background: #e86f1b; color: #fff; box-shadow: 0 8px 24px rgba(244,119,33,.2); }
 .update-dialog-actions button:disabled { opacity: .6; cursor: wait; }
-.update-dialog-overlay[data-state="ready"] .update-dialog { border-color: rgba(68,190,125,.5); }
-.update-dialog-overlay[data-state="ready"] .update-dialog::before { background: linear-gradient(90deg, transparent, #48c989, transparent); box-shadow: 0 0 18px rgba(72,201,137,.38); }
-.update-dialog-overlay[data-state="ready"] .update-dialog-icon { border-color: rgba(72,201,137,.45); color: #62d99b; background: rgba(72,201,137,.08); box-shadow: 0 0 16px rgba(72,201,137,.1); }
-.update-dialog-overlay[data-state="ready"] .update-dialog-kicker { color: #69d7a1; }
-.update-dialog-overlay[data-state="ready"] .update-version-arrow { color: #62d99b; }
 .update-progress-title { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .update-progress-title i { color: #f47721; font-size: 16px; }
 .update-progress-title strong { margin-left: auto; color: #f3a15c; font-size: 12px; }
@@ -587,7 +582,7 @@ textarea {
       <div class="update-dialog-icon"><i class="ph ph-arrow-circle-down"></i></div>
       <div class="update-dialog-heading"><div class="update-dialog-kicker">DEEPSEEK CODEX · UPDATE</div><h2 id="update-dialog-title">发现新版本</h2></div>
     </div>
-    <div class="update-dialog-body"><p class="update-dialog-version"></p><p class="update-dialog-copy">下载将在后台进行，完成后重启应用即可更新。</p></div>
+    <div class="update-dialog-body"><p class="update-dialog-version"></p><p class="update-dialog-copy">点击下载后将返回主界面，完成后应用会自动重启并安装更新。</p></div>
     <div class="update-dialog-actions"><button class="update-dialog-later" type="button">稍后提醒</button><button class="update-dialog-primary" type="button"><i class="ph ph-download-simple"></i> 下载更新</button></div>
   </section>
 </div>

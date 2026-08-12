@@ -281,13 +281,12 @@ function closeUpdateDialog() {
 
 window.deepseekCodex.onUpdateAvailable?.((data) => {
   if (!updateDialog) return;
-  updateDialogPrimary.dataset.ready = "false";
   updateDialog.dataset.state = "available";
   updateDialog.querySelector(".update-dialog-icon").innerHTML = '<i class="ph ph-arrow-circle-down"></i>';
   updateDialog.querySelector(".update-dialog-kicker").textContent = "DEEPSEEK CODEX · UPDATE";
   updateDialog.querySelector("#update-dialog-title").textContent = "发现新版本";
   updateDialogVersion.innerHTML = `<span class="update-version-old">v${data?.currentVersion || "--"}</span><i class="ph ph-arrow-right update-version-arrow"></i><span class="update-version-new">v${data?.version || "--"}</span>`;
-  updateDialog.querySelector(".update-dialog-copy").textContent = "下载将在后台进行，完成后重启应用即可更新。";
+  updateDialog.querySelector(".update-dialog-copy").textContent = "点击下载后将返回主界面，完成后应用会自动重启并安装更新。";
   updateDialogPrimary.disabled = false;
   updateDialogPrimary.innerHTML = '<i class="ph ph-download-simple"></i> 下载更新';
   updateDialog.hidden = false;
@@ -296,33 +295,33 @@ window.deepseekCodex.onUpdateAvailable?.((data) => {
 updateDialogLater?.addEventListener("click", closeUpdateDialog);
 updateDialogPrimary?.addEventListener("click", async () => {
   if (!updateDialogPrimary) return;
-  if (updateDialogPrimary.dataset.ready === "true") {
-    await window.deepseekCodex.restartToUpdate?.();
-    return;
-  }
   updateDialogPrimary.disabled = true;
   updateDialogPrimary.innerHTML = '<i class="ph ph-spinner-gap"></i> 正在准备下载';
+  closeUpdateDialog();
+  if (updateProgressToast) {
+    updateProgressToast.hidden = false;
+    updateProgressToast.querySelector("span").textContent = "正在准备下载";
+  }
+  if (updateProgressBar) updateProgressBar.style.width = "0%";
+  if (updateProgressPercent) updateProgressPercent.textContent = "0%";
   const result = await window.deepseekCodex.downloadUpdate?.();
   if (!result?.ok) {
     updateDialogPrimary.disabled = false;
     updateDialogPrimary.innerHTML = '<i class="ph ph-download-simple"></i> 重新下载';
+    if (updateProgressToast) {
+      updateProgressToast.querySelector("span").textContent = "更新下载失败，请稍后重试";
+      setTimeout(() => { updateProgressToast.hidden = true; }, 5000);
+    }
     return;
   }
-  closeUpdateDialog();
 });
 
-window.deepseekCodex.onUpdateReady?.(() => {
-  if (!updateDialog) return;
-  updateDialog.dataset.state = "ready";
-  updateDialog.querySelector(".update-dialog-icon").innerHTML = '<i class="ph ph-check"></i>';
-  updateDialog.querySelector(".update-dialog-kicker").textContent = "UPDATE READY";
-  updateDialog.querySelector("#update-dialog-title").textContent = "更新已准备完成";
-  updateDialogVersion.innerHTML = '<span class="update-version-new">新版本已下载到本机</span><i class="ph ph-check-circle update-version-arrow"></i>';
-  updateDialog.querySelector(".update-dialog-copy").textContent = "重启后自动完成安装，当前任务与历史记录不会丢失。";
-  updateDialogPrimary.disabled = false;
-  updateDialogPrimary.dataset.ready = "true";
-  updateDialogPrimary.innerHTML = '<i class="ph ph-arrow-clockwise"></i> 立即重启';
-  updateDialog.hidden = false;
+window.deepseekCodex.onUpdateDownloadError?.(() => {
+  if (!updateProgressToast) return;
+  updateProgressToast.hidden = false;
+  updateProgressToast.querySelector("span").textContent = "更新下载失败，请稍后重试";
+  if (updateProgressPercent) updateProgressPercent.textContent = "!";
+  setTimeout(() => { updateProgressToast.hidden = true; }, 5000);
 });
 
 window.deepseekCodex.onUpdateDownloadProgress?.((data) => {
@@ -332,8 +331,7 @@ window.deepseekCodex.onUpdateDownloadProgress?.((data) => {
   if (updateProgressBar) updateProgressBar.style.width = `${percent}%`;
   if (updateProgressPercent) updateProgressPercent.textContent = `${percent}%`;
   if (data?.completed) {
-    updateProgressToast.querySelector("span").textContent = "更新下载完成，准备重启";
-    setTimeout(() => { updateProgressToast.hidden = true; }, 2500);
+    updateProgressToast.querySelector("span").textContent = "更新下载完成，正在自动重启";
   }
 });
 

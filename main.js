@@ -33,6 +33,8 @@ let shuttingDown = false;
 
 const WINDOW_STATE_FILE = "window-state.json";
 let updatePromptShown = false;
+let updateDownloadInProgress = false;
+let updateInstallScheduled = false;
 
 function setupAutoUpdater() {
   if (!app.isPackaged) return;
@@ -41,7 +43,7 @@ function setupAutoUpdater() {
   autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on("update-available", async (info) => {
-    if (updatePromptShown) return;
+    if (updatePromptShown || updateDownloadInProgress || updateInstallScheduled) return;
     updatePromptShown = true;
     mainWindow?.webContents.send("update-available", {
       version: info.version,
@@ -51,8 +53,21 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on("update-downloaded", async () => {
+    updateDownloadInProgress = false;
     mainWindow?.webContents.send("update-download-progress", { percent: 100, completed: true });
-    mainWindow?.webContents.send("update-ready");
+    if (updateInstallScheduled) return;
+
+    updateInstallScheduled = true;
+    setTimeout(() => {
+      try {
+        autoUpdater.quitAndInstall(true, true);
+      } catch (error) {
+        updateInstallScheduled = false;
+        mainWindow?.webContents.send("update-download-error", {
+          message: error?.message || "更新安装启动失败"
+        });
+      }
+    }, 900);
   });
 
   autoUpdater.on("download-progress", (progress) => {
@@ -63,8 +78,14 @@ function setupAutoUpdater() {
     });
   });
 
-  autoUpdater.on("error", () => {
-    // 更新失败不影响当前版本继续使用。
+  autoUpdater.on("error", (error) => {
+    if (updateDownloadInProgress || updateInstallScheduled) {
+      mainWindow?.webContents.send("update-download-error", {
+        message: error?.message || "更新下载失败"
+      });
+    }
+    updateDownloadInProgress = false;
+    updateInstallScheduled = false;
   });
 
   setTimeout(() => {
@@ -75,17 +96,18 @@ function setupAutoUpdater() {
 }
 
 ipcMain.handle("download-update", async () => {
+  if (updateDownloadInProgress) {
+    return { ok: true, inProgress: true };
+  }
+
+  updateDownloadInProgress = true;
   try {
     await autoUpdater.downloadUpdate();
     return { ok: true };
   } catch (error) {
+    updateDownloadInProgress = false;
     return { ok: false, message: error?.message || "更新下载失败" };
   }
-});
-
-ipcMain.handle("restart-to-update", () => {
-  autoUpdater.quitAndInstall();
-  return { ok: true };
 });
 
 function getWindowStatePath() {

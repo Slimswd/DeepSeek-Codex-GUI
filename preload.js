@@ -82,11 +82,10 @@ contextBridge.exposeInMainWorld("deepseekCodex", {
   onUpdateAvailable: (callback) => {
     ipcRenderer.on("update-available", (_event, data) => callback(data));
   },
-  onUpdateReady: (callback) => {
-    ipcRenderer.on("update-ready", () => callback());
+  onUpdateDownloadError: (callback) => {
+    ipcRenderer.on("update-download-error", (_event, data) => callback(data));
   },
   downloadUpdate: () => ipcRenderer.invoke("download-update"),
-  restartToUpdate: () => ipcRenderer.invoke("restart-to-update"),
 
   getGitStatus: () =>
     ipcRenderer.invoke("get-git-status"),
