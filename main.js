@@ -38,6 +38,47 @@ let updateReadyToInstall = false;
 let updateInstallInProgress = false;
 let updateInstallRequested = false;
 
+function getUpdateReleaseSummary(releaseNotes) {
+  const fallback = "本次版本包含功能优化与稳定性改进。";
+  const rawNotes = Array.isArray(releaseNotes)
+    ? releaseNotes.map((item) => (typeof item === "string" ? item : item?.note || "")).join("\n")
+    : String(releaseNotes || "");
+
+  const summaries = [];
+  for (const rawLine of rawNotes.replace(/\r/g, "").split("\n")) {
+    const trimmedRawLine = rawLine.trim();
+    if (
+      !trimmedRawLine ||
+      /^#{1,6}\s+/.test(trimmedRawLine) ||
+      /^\d+\.\d+\.\d+\s*(?:—|-)/.test(trimmedRawLine)
+    ) {
+      continue;
+    }
+
+    const line = rawLine
+      .replace(/```.*$/g, "")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/^\s*(?:[-*+]\s+|\d+[.)]\s+|#{1,6}\s*)/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (
+      /^(what'?s changed|full changelog|compare changes|更新日志|变更记录)[:：]?$/i.test(line) ||
+      /^https?:\/\//i.test(line)
+    ) {
+      continue;
+    }
+
+    const compact = line.length > 90 ? `${line.slice(0, 89).trim()}…` : line;
+    if (!summaries.includes(compact)) summaries.push(compact);
+    if (summaries.length >= 3) break;
+  }
+
+  return summaries.length ? summaries : [fallback];
+}
+
 function getPendingUpdateTaskState() {
   return {
     activeTaskCount: taskRuntime.activeCount(),
@@ -110,7 +151,8 @@ function setupAutoUpdater() {
     updatePromptShown = true;
     mainWindow?.webContents.send("update-available", {
       version: info.version,
-      currentVersion: app.getVersion()
+      currentVersion: app.getVersion(),
+      releaseSummary: getUpdateReleaseSummary(info.releaseNotes)
     });
     updatePromptShown = false;
   });

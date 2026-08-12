@@ -1,6 +1,6 @@
 {
   "name": "deepseek-codex-gui",
-  "version": "1.0.22",
+  "version": "1.0.23",
   "description": "DeepSeek V4 Flash powered Codex desktop client",
   "main": "main.js",
   "scripts": {

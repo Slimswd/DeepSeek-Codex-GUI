@@ -146,6 +146,13 @@ body {
 .update-version-old { color: #8f9caa; }
 .update-version-arrow { color: #f47721; font-size: 16px; }
 .update-version-new { color: #f4f7fa; font-weight: 650; }
+.update-release-summary { margin-top: 13px; padding: 11px 13px; border: 1px solid rgba(53,71,87,.86); border-radius: 11px; background: linear-gradient(135deg, rgba(21,33,45,.88), rgba(14,24,34,.72)); }
+.update-release-summary[hidden] { display: none; }
+.update-release-summary-title { display: flex; align-items: center; gap: 7px; color: #d6e2ed; font-size: 12px; font-weight: 650; }
+.update-release-summary-title i { color: #f47721; font-size: 15px; }
+.update-release-summary-list { display: grid; gap: 5px; margin: 8px 0 0; padding: 0; color: #aebdca; font-size: 12px; line-height: 1.5; list-style: none; }
+.update-release-summary-list li { position: relative; padding-left: 12px; }
+.update-release-summary-list li::before { content: ""; position: absolute; top: .62em; left: 1px; width: 4px; height: 4px; border-radius: 50%; background: #f47721; box-shadow: 0 0 7px rgba(244,119,33,.55); }
 .update-dialog-actions { display: flex; justify-content: flex-end; gap: 9px; padding: 14px 22px 18px; border-top: 1px solid rgba(55,70,84,.58); background: rgba(4,10,15,.34); }
 .update-dialog-actions button { min-height: 34px; padding: 0 15px; border: 1px solid #344454; border-radius: 999px; background: transparent; color: #b8c5d1; font: inherit; font-size: 12px; cursor: pointer; transition: .16s ease; }
 .update-dialog-actions button:hover { border-color: #526477; color: #fff; background: rgba(255,255,255,.035); }
@@ -593,7 +600,7 @@ textarea {
       <div class="update-dialog-icon"><i class="ph ph-arrow-circle-down"></i></div>
       <div class="update-dialog-heading"><div class="update-dialog-kicker">DEEPSEEK CODEX · UPDATE</div><h2 id="update-dialog-title">发现新版本</h2></div>
     </div>
-    <div class="update-dialog-body"><p class="update-dialog-version"></p><p class="update-dialog-copy">点击下载后将返回主界面；下载完成后可由你选择何时安装。</p></div>
+    <div class="update-dialog-body"><p class="update-dialog-version"></p><p class="update-dialog-copy">点击下载后将返回主界面；下载完成后可由你选择何时安装。</p><div class="update-release-summary" hidden><div class="update-release-summary-title"><i class="ph ph-sparkle"></i><span>本次更新</span></div><ul class="update-release-summary-list"></ul></div></div>
     <div class="update-dialog-actions"><button class="update-dialog-later" type="button">稍后提醒</button><button class="update-dialog-primary" type="button"><i class="ph ph-download-simple"></i> 下载更新</button></div>
   </section>
 </div>

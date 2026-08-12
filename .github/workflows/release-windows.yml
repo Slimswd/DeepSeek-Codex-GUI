@@ -56,11 +56,21 @@ jobs:
       - name: Build Windows installer
         run: npm run dist -- --publish never
 
+      - name: Prepare release notes
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          $content = Get-Content -LiteralPath "CHANGELOG.md" -Raw
+          $escapedVersion = [regex]::Escape($version)
+          $match = [regex]::Match($content, "(?ms)^##\\s+$escapedVersion\\b.*?(?=^##\\s+|\\z)")
+          if (-not $match.Success) { throw "No CHANGELOG.md entry found for version $version" }
+          Set-Content -LiteralPath "release-notes.md" -Value $match.Value.Trim() -Encoding utf8
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: DeepSeek Codex ${{ github.ref_name }}
-          generate_release_notes: true
+          body_path: release-notes.md
           make_latest: true
           files: |
             dist/DeepSeek-Codex-Setup-*.exe

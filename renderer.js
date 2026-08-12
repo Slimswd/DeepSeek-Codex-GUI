@@ -25,6 +25,8 @@ const updateProgressToast = document.querySelector(".update-progress-toast");
 const updateProgressBar = document.querySelector(".update-progress-bar");
 const updateDialog = document.querySelector(".update-dialog-overlay");
 const updateDialogVersion = document.querySelector(".update-dialog-version");
+const updateReleaseSummary = document.querySelector(".update-release-summary");
+const updateReleaseSummaryList = document.querySelector(".update-release-summary-list");
 const updateDialogPrimary = document.querySelector(".update-dialog-primary");
 const updateDialogLater = document.querySelector(".update-dialog-later");
 const updateProgressPercent = updateProgressToast?.querySelector("strong");
@@ -285,6 +287,18 @@ function closeUpdateDialog() {
   if (updateDialog) updateDialog.hidden = true;
 }
 
+function renderUpdateReleaseSummary(items) {
+  if (!updateReleaseSummary || !updateReleaseSummaryList) return;
+  const summaries = Array.isArray(items) ? items.filter((item) => typeof item === "string" && item.trim()) : [];
+  updateReleaseSummaryList.replaceChildren();
+  for (const summary of summaries.slice(0, 3)) {
+    const item = document.createElement("li");
+    item.textContent = summary.trim();
+    updateReleaseSummaryList.append(item);
+  }
+  updateReleaseSummary.hidden = summaries.length === 0;
+}
+
 function formatUpdateBytes(bytes) {
   const value = Number(bytes);
   if (!Number.isFinite(value) || value < 0) return "";
@@ -317,6 +331,7 @@ window.deepseekCodex.onUpdateAvailable?.((data) => {
   updateDialog.querySelector("#update-dialog-title").textContent = "发现新版本";
   updateDialogVersion.innerHTML = `<span class="update-version-old">v${data?.currentVersion || "--"}</span><i class="ph ph-arrow-right update-version-arrow"></i><span class="update-version-new">v${data?.version || "--"}</span>`;
   updateDialog.querySelector(".update-dialog-copy").textContent = "点击下载后将返回主界面；下载完成后可由你选择何时安装。";
+  renderUpdateReleaseSummary(data?.releaseSummary || ["本次版本包含功能优化与稳定性改进。"]);
   updateDialogPrimary.disabled = false;
   updateDialogPrimary.innerHTML = '<i class="ph ph-download-simple"></i> 下载更新';
   updateDialog.hidden = false;
