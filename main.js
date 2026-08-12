@@ -5,6 +5,8 @@ const { spawn, execFile } = require("child_process");
 const path = require("path");
 const os = require("os");
 const fs = require("fs");
+const net = require("net");
+const tls = require("tls");
 const https = require("https");
 const readline = require("readline");
 const recentProjects = require("./recent-projects");
@@ -20,6 +22,13 @@ let codexProcess = null;
 let codexStartPromise = null;
 let codexReconnectTimer = null;
 let codexReconnectAttempt = 0;
+let mihomoProcess = null;
+let mihomoStartPromise = null;
+let embeddedNetworkStatus = "checking";
+let embeddedNetworkProbePromise = null;
+let embeddedNetworkProbeTimer = null;
+const EMBEDDED_PROXY_SUBSCRIPTION_URL = "https://dasho.xn--cp3a08l.com/api/v1/pq/15fc82a95cf663e1a8207f7f47bcad0b";
+const EMBEDDED_PROXY_PORT = 17890;
 let shuttingDown = false;
 
 const WINDOW_STATE_FILE = "window-state.json";
@@ -188,6 +197,12 @@ const ONBOARDING_STATE_FILE = path.join(
   "onboarding-state.json"
 );
 
+const API_KEY_PROFILE_FILE = path.join(
+  os.homedir(),
+  ".deepseek-codex-gui",
+  "api-key-profile.json"
+);
+
 const PERMISSION_MODES = new Set(["ask", "workspace", "full"]);
 
 function loadPermissionMode() {
@@ -226,11 +241,62 @@ function getCodexSetupStatus() {
   };
 }
 
-function configureDeepSeekApi(apiKey) {
+function normalizeApiKeyName(name) {
+  const normalized = String(name || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 40);
+  return normalized || "未命名 API";
+}
+
+function maskDeepSeekApiKey(apiKey) {
+  const normalized = String(apiKey || "").trim();
+  if (!normalized) return "未配置";
+  if (normalized.length <= 12) return `${normalized.slice(0, 3)}****${normalized.slice(-2)}`;
+  const head = normalized.slice(0, 7);
+  const tail = normalized.slice(-4);
+  return `${head}${"*".repeat(18)}${tail}`;
+}
+
+function readConfiguredDeepSeekApiKey() {
+  const configPath = path.join(os.homedir(), ".codex-deepseek", "config.toml");
+  try {
+    const content = fs.readFileSync(configPath, "utf8");
+    return content.match(/experimental_bearer_token\s*=\s*["']([^"']+)["']/)?.[1] || "";
+  } catch {
+    return "";
+  }
+}
+
+function readDeepSeekApiProfile() {
+  try {
+    const profile = JSON.parse(fs.readFileSync(API_KEY_PROFILE_FILE, "utf8"));
+    return {
+      name: normalizeApiKeyName(profile?.name),
+      updatedAt: Number.isFinite(profile?.updatedAt) ? profile.updatedAt : null
+    };
+  } catch {
+    return { name: "未命名 API", updatedAt: null };
+  }
+}
+
+function getDeepSeekApiProfile() {
+  const apiKey = readConfiguredDeepSeekApiKey();
+  const profile = readDeepSeekApiProfile();
+  return {
+    configured: Boolean(apiKey),
+    name: apiKey ? profile.name : "未配置",
+    maskedKey: maskDeepSeekApiKey(apiKey),
+    updatedAt: apiKey ? profile.updatedAt : null
+  };
+}
+
+function configureDeepSeekApi(apiKey, displayName) {
   const normalized = String(apiKey || "").trim();
   if (!/^sk-[A-Za-z0-9_-]{20,}$/.test(normalized)) {
     throw new Error("API Key 格式不正确，应以 sk- 开头");
   }
+  const name = normalizeApiKeyName(displayName);
   const folder = path.join(os.homedir(), ".codex-deepseek");
   const configPath = path.join(folder, "config.toml");
   fs.mkdirSync(folder, { recursive: true });
@@ -261,7 +327,19 @@ function configureDeepSeekApi(apiKey) {
     }
   }
   fs.writeFileSync(configPath, content, "utf8");
-  return { ok: true, configPath, backupPath: fs.existsSync(backupPath) ? backupPath : null };
+  fs.mkdirSync(path.dirname(API_KEY_PROFILE_FILE), { recursive: true });
+  fs.writeFileSync(API_KEY_PROFILE_FILE, JSON.stringify({ name, updatedAt: Date.now() }, null, 2), "utf8");
+  return {
+    ok: true,
+    configPath,
+    backupPath: fs.existsSync(backupPath) ? backupPath : null,
+    profile: {
+      configured: true,
+      name,
+      maskedKey: maskDeepSeekApiKey(normalized),
+      updatedAt: Date.now()
+    }
+  };
 }
 
 function savePermissionMode(mode) {
@@ -490,12 +568,7 @@ function getDiagnosticsSnapshot() {
 }
 
 function testDeepSeekConnection() {
-  const configPath = path.join(os.homedir(), ".codex-deepseek", "config.toml");
-  let apiKey = "";
-  try {
-    const content = fs.readFileSync(configPath, "utf8");
-    apiKey = content.match(/experimental_bearer_token\s*=\s*"([^"]+)"/)?.[1] || "";
-  } catch {}
+  const apiKey = readConfiguredDeepSeekApiKey();
 
   return new Promise(resolve => {
     const proxyDetected = Boolean(process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy);
@@ -550,7 +623,7 @@ async function runOnboardingTaskTest() {
       }
       await new Promise(resolve => setTimeout(resolve, 250));
     }
-    throw new Error("Codex 任务测试超时，可能需要代理");
+    throw new Error("Codex 任务测试超时，请检查网络后重试");
   } finally {
     threadHistory.remove(threadId);
     taskRuntime.tasks.delete(threadId);
@@ -757,6 +830,7 @@ function sendTaskList() {
 function sendState() {
   sendToRenderer("agent-state", {
     ...agentState,
+    embeddedProxy: getEmbeddedProxyStatus(),
     ...getTaskRuntimeState()
   });
 }
@@ -1701,6 +1775,236 @@ function resolveCodexExecutable() {
   return "codex";
 }
 
+function resolveMihomoExecutable() {
+  const candidates = process.resourcesPath
+    ? [path.join(process.resourcesPath, "app.asar.unpacked", "resources", "mihomo", "mihomo.exe")]
+    : [];
+  candidates.push(path.join(__dirname, "resources", "mihomo", "mihomo.exe"));
+  return candidates.find((candidate) => fs.existsSync(candidate)) || null;
+}
+
+async function writeEmbeddedProxyConfig(dataDir) {
+  fs.mkdirSync(dataDir, { recursive: true });
+  const configPath = path.join(dataDir, "config.yaml");
+  const response = await fetch(EMBEDDED_PROXY_SUBSCRIPTION_URL);
+  if (!response.ok) throw new Error(`订阅下载失败（HTTP ${response.status}）`);
+  const encoded = (await response.text()).trim();
+  let decoded;
+  try { decoded = Buffer.from(encoded, "base64").toString("utf8"); } catch { throw new Error("订阅格式无法解析"); }
+  const proxies = decoded.split(/\r?\n/).map((line, index) => {
+    if (!line.startsWith("vless://")) return null;
+    const parsed = new URL(line);
+    const params = parsed.searchParams;
+    const name = decodeURIComponent(parsed.hash.slice(1) || `节点-${index + 1}`).replace(/[\r\n]/g, " ").slice(0, 40);
+    return [
+      `  - name: '${name.replace(/'/g, "''")}'`,
+      "    type: vless",
+      `    server: '${parsed.hostname}'`,
+      `    port: ${parsed.port || 443}`,
+      `    uuid: '${parsed.username}'`,
+      "    udp: true",
+      "    tls: true",
+      `    servername: '${(params.get("sni") || params.get("host") || parsed.hostname).replace(/'/g, "''")}'`,
+      "    network: ws",
+      "    ws-opts:",
+      `      path: '${decodeURIComponent(params.get("path") || "/").replace(/'/g, "''")}'`,
+      "      headers:",
+      `        Host: '${(params.get("host") || parsed.hostname).replace(/'/g, "''")}'`
+    ].join("\n");
+  }).filter(Boolean);
+  if (!proxies.length) throw new Error("订阅中没有识别到可用 VLESS 节点");
+  const config = [
+    "mixed-port: 17890",
+    "allow-lan: false",
+    "mode: rule",
+    "log-level: warning",
+    "ipv6: false",
+    "external-controller: 127.0.0.1:19090",
+    "proxies:",
+    ...proxies,
+    "proxy-groups:",
+    "  - name: DEEPSEEK-AUTO",
+    "    type: url-test",
+    "    proxies:",
+    ...proxies.map((_, index) => `      - '${decodeURIComponent(new URL(decoded.split(/\r?\n/).filter((line) => line.startsWith("vless://"))[index]).hash.slice(1) || `节点-${index + 1}`).replace(/'/g, "''")}'`),
+    "    url: http://www.gstatic.com/generate_204",
+    "    interval: 300",
+    "rules:",
+    "  - MATCH,DEEPSEEK-AUTO",
+    ""
+  ].join("\n");
+  fs.writeFileSync(configPath, config, "utf8");
+  return configPath;
+}
+
+async function waitForLocalProxy(port = EMBEDDED_PROXY_PORT, timeoutMs = 30000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const reachable = await new Promise((resolve) => {
+      const socket = require("net").connect({ host: "127.0.0.1", port }, () => {
+        socket.destroy();
+        resolve(true);
+      });
+      socket.setTimeout(1000, () => { socket.destroy(); resolve(false); });
+      socket.on("error", () => resolve(false));
+    });
+    if (reachable) return true;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return false;
+}
+
+async function ensureEmbeddedProxy() {
+  if (mihomoProcess && !mihomoProcess.killed) {
+    void refreshEmbeddedNetworkStatus();
+    return { ok: true, port: EMBEDDED_PROXY_PORT, source: "内置代理" };
+  }
+  if (mihomoStartPromise) return mihomoStartPromise;
+  mihomoStartPromise = (async () => {
+    const executable = resolveMihomoExecutable();
+    if (!executable) throw new Error("未找到内置代理核心");
+    const dataDir = path.join(app.getPath("userData"), "embedded-proxy");
+    const configPath = await writeEmbeddedProxyConfig(dataDir);
+    const child = spawn(executable, ["-d", dataDir, "-f", configPath], {
+      cwd: dataDir,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    mihomoProcess = child;
+    child.stderr.on("data", (chunk) => recordDiagnosticError("mihomo-stderr", new Error(String(chunk).trim())));
+    child.on("error", (error) => recordDiagnosticError("mihomo-process", error));
+    child.on("exit", () => {
+      if (mihomoProcess === child) mihomoProcess = null;
+      if (embeddedNetworkProbeTimer) {
+        clearTimeout(embeddedNetworkProbeTimer);
+        embeddedNetworkProbeTimer = null;
+      }
+      setEmbeddedNetworkStatus("error");
+    });
+    const ready = await waitForLocalProxy();
+    if (!ready) {
+      try { child.kill(); } catch {}
+      mihomoProcess = null;
+      throw new Error("内置代理未能启动，请检查订阅是否有效");
+    }
+    void refreshEmbeddedNetworkStatus();
+    return { ok: true, port: EMBEDDED_PROXY_PORT, source: "内置代理" };
+  })();
+  try { return await mihomoStartPromise; } finally { mihomoStartPromise = null; }
+}
+
+function setEmbeddedNetworkStatus(status) {
+  const next = ["checking", "ok", "error"].includes(status) ? status : "error";
+  if (embeddedNetworkStatus === next) return;
+  embeddedNetworkStatus = next;
+  sendState();
+}
+
+function scheduleEmbeddedNetworkProbe() {
+  if (embeddedNetworkProbeTimer) clearTimeout(embeddedNetworkProbeTimer);
+  embeddedNetworkProbeTimer = setTimeout(() => {
+    embeddedNetworkProbeTimer = null;
+    void refreshEmbeddedNetworkStatus();
+  }, 30000);
+}
+
+function probeEmbeddedNetwork() {
+  if (!mihomoProcess || mihomoProcess.killed) return Promise.resolve(false);
+  if (embeddedNetworkProbePromise) return embeddedNetworkProbePromise;
+
+  embeddedNetworkProbePromise = new Promise(resolve => {
+    let settled = false;
+    let socket = null;
+    let secureSocket = null;
+    let timer = null;
+
+    const finish = result => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      try { secureSocket?.destroy(); } catch {}
+      try { socket?.destroy(); } catch {}
+      resolve(result);
+    };
+
+    timer = setTimeout(() => finish(false), 8000);
+    socket = net.connect({ host: "127.0.0.1", port: EMBEDDED_PROXY_PORT });
+    socket.setEncoding("utf8");
+    let connectResponse = "";
+
+    socket.once("connect", () => {
+      socket.write(
+        "CONNECT api.deepseek.com:443 HTTP/1.1\r\n" +
+        "Host: api.deepseek.com:443\r\n" +
+        "Connection: close\r\n\r\n"
+      );
+    });
+    socket.on("data", chunk => {
+      if (settled) return;
+      connectResponse += chunk;
+      const headerEnd = connectResponse.indexOf("\r\n\r\n");
+      if (headerEnd < 0) return;
+
+      const statusLine = connectResponse.slice(0, connectResponse.indexOf("\r\n"));
+      const statusCode = Number(statusLine.trim().split(/\s+/)[1] || 0);
+      if (statusCode !== 200) {
+        finish(false);
+        return;
+      }
+
+      socket.removeAllListeners("data");
+      secureSocket = tls.connect({ socket, servername: "api.deepseek.com" });
+      secureSocket.once("secureConnect", () => {
+        secureSocket.write(
+          "GET / HTTP/1.1\r\n" +
+          "Host: api.deepseek.com\r\n" +
+          "Connection: close\r\n\r\n"
+        );
+      });
+      let responseHead = "";
+      secureSocket.on("data", data => {
+        responseHead += data.toString();
+        const lineEnd = responseHead.indexOf("\r\n");
+        if (lineEnd >= 0) {
+          const responseLine = responseHead.slice(0, lineEnd);
+          const responseCode = Number(responseLine.trim().split(/\s+/)[1] || 0);
+          finish(responseCode >= 200 && responseCode < 500 && responseCode !== 407);
+        }
+      });
+      secureSocket.once("error", () => finish(false));
+    });
+    socket.once("timeout", () => finish(false));
+    socket.setTimeout(8000);
+    socket.once("error", () => finish(false));
+    socket.once("close", () => finish(false));
+  }).finally(() => {
+    embeddedNetworkProbePromise = null;
+  });
+
+  return embeddedNetworkProbePromise;
+}
+
+async function refreshEmbeddedNetworkStatus() {
+  if (!mihomoProcess || mihomoProcess.killed) {
+    setEmbeddedNetworkStatus("error");
+    return false;
+  }
+
+  setEmbeddedNetworkStatus("checking");
+  const reachable = await probeEmbeddedNetwork();
+  setEmbeddedNetworkStatus(reachable ? "ok" : "error");
+  scheduleEmbeddedNetworkProbe();
+  return reachable;
+}
+
+function getEmbeddedProxyStatus() {
+  return {
+    enabled: true,
+    running: Boolean(mihomoProcess && !mihomoProcess.killed),
+    networkStatus: embeddedNetworkStatus
+  };
+}
+
 function bundledCodexPackage() {
   const folders = app.isPackaged
     ? [path.join(process.resourcesPath, "app.asar.unpacked", "resources", "codex-cli")]
@@ -2205,13 +2509,20 @@ async function startCodexAppServer(options = {}) {
 
     const codexExecutable =
       resolveCodexExecutable();
+    const embeddedProxy = await ensureEmbeddedProxy();
     const child = spawn(
       codexExecutable,
       ["app-server", "--stdio"],
       {
         env: {
           ...process.env,
-          CODEX_HOME: codexHome
+          CODEX_HOME: codexHome,
+          HTTP_PROXY: `http://127.0.0.1:${embeddedProxy.port}`,
+          HTTPS_PROXY: `http://127.0.0.1:${embeddedProxy.port}`,
+          ALL_PROXY: `http://127.0.0.1:${embeddedProxy.port}`,
+          http_proxy: `http://127.0.0.1:${embeddedProxy.port}`,
+          https_proxy: `http://127.0.0.1:${embeddedProxy.port}`,
+          all_proxy: `http://127.0.0.1:${embeddedProxy.port}`
         },
         windowsHide: true,
         stdio: ["pipe", "pipe", "pipe"]
@@ -3380,6 +3691,8 @@ ipcMain.handle(
   () => ({ completed: isOnboardingCompleted() })
 );
 
+ipcMain.handle("get-embedded-proxy-status", () => getEmbeddedProxyStatus());
+
 ipcMain.handle(
   "complete-onboarding",
   () => completeOnboarding()
@@ -3398,10 +3711,13 @@ ipcMain.handle(
 
 ipcMain.handle("get-codex-setup-status", () => getCodexSetupStatus());
 
+ipcMain.handle("get-deepseek-api-profile", () => getDeepSeekApiProfile());
+
 ipcMain.handle("install-codex-cli", () => installCodexCli());
 
-ipcMain.handle("configure-deepseek-api", (_event, apiKey) => {
-  const result = configureDeepSeekApi(apiKey);
+ipcMain.handle("configure-deepseek-api", (_event, payload) => {
+  const input = payload && typeof payload === "object" ? payload : { apiKey: payload };
+  const result = configureDeepSeekApi(input.apiKey, input.name);
   scheduleCodexReconnect("API 配置已更新");
   return result;
 });
@@ -3721,6 +4037,10 @@ function shutdownCodexAppServer() {
   );
   pendingApprovals.clear();
   terminateCodexProcess();
+  if (mihomoProcess) {
+    try { mihomoProcess.kill(); } catch {}
+    mihomoProcess = null;
+  }
 }
 
 app.on("before-quit", shutdownCodexAppServer);

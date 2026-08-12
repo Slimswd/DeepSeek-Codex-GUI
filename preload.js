@@ -64,13 +64,15 @@ contextBridge.exposeInMainWorld("deepseekCodex", {
     ipcRenderer.invoke("set-permission-settings", mode),
 
   getOnboardingState: () => ipcRenderer.invoke("get-onboarding-state"),
+  getEmbeddedProxyStatus: () => ipcRenderer.invoke("get-embedded-proxy-status"),
 
   completeOnboarding: () => ipcRenderer.invoke("complete-onboarding"),
 
     openCodexConfigFolder: () => ipcRenderer.invoke("open-codex-config-folder"),
     getCodexSetupStatus: () => ipcRenderer.invoke("get-codex-setup-status"),
     installCodexCli: () => ipcRenderer.invoke("install-codex-cli"),
-    configureDeepSeekApi: (apiKey) => ipcRenderer.invoke("configure-deepseek-api", apiKey),
+    getDeepSeekApiProfile: () => ipcRenderer.invoke("get-deepseek-api-profile"),
+    configureDeepSeekApi: (payload) => ipcRenderer.invoke("configure-deepseek-api", payload),
     testDeepSeekConnection: () => ipcRenderer.invoke("test-deepseek-connection"),
   runOnboardingTaskTest: () => ipcRenderer.invoke("run-onboarding-task-test"),
   checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),

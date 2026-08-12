@@ -1,6 +1,6 @@
 {
   "name": "deepseek-codex-gui",
-  "version": "1.0.12",
+  "version": "1.0.18",
   "description": "DeepSeek V4 Flash powered Codex desktop client",
   "main": "main.js",
   "scripts": {
@@ -28,7 +28,8 @@
       "!dist/**"
     ],
     "asarUnpack": [
-      "resources/codex-cli/*.tgz"
+      "resources/codex-cli/*.tgz",
+      "resources/mihomo/mihomo.exe"
     ],
     "win": {
       "target": "nsis",

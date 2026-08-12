@@ -1,6 +1,6 @@
 # DeepSeek Codex GUI — PROJECT_STATUS.md
 
-最后更新：2026-08-11
+最后更新：2026-08-12
 
 ## 1. 项目概述
 
@@ -499,6 +499,49 @@
 6. 不要重新实现已经验证通过的功能
 7. 完成任务后更新项目状态
 8. 主动给出下一步 1～3 个优先建议
+
+## 9. 2026-08-12 — 1.0.14 主题恢复回归修复
+
+- 根因确认：新增顶部控件后，旧的 Context / Token 按钮仍尝试插入旧的 `model-pill` 父节点，并以不属于该节点的诊断按钮作为参考节点，触发 DOM `NotFoundError`。
+- 该异常发生在主题加载之前，因此用户保存的 `C:\Users\JoyJo\.deepseek-codex-gui\theme-settings.json` 虽然仍是 `goku`，页面却停留在基础深色主题。
+- 已将上下文用量、Git 审查、主题、API、诊断和内置代理状态入口统一挂载到 `.topbar-actions`，并保留启动中的代理状态占位文案。
+- 已通过 `node --check main.js`、`node --check preload.js`、`node --check renderer.js`、`npm test` 和 `git diff --check`。
+- 已重新生成并安装 `dist\\DeepSeek-Codex-Setup-1.0.14.exe`；本机实际启动确认悟空主题、水墨 D 图标、悟空背景、主题选择栏和 `代理 · 运行中 :17890` 均正常。
+
+## 10. 2026-08-12 — 1.0.15 API 更换入口修复
+
+- 根因确认：顶部“更换 API”按钮复用了 `.diagnostics-trigger`，在角色主题首页的欢迎状态下被统一隐藏；原生 `prompt` 也无法提供稳定一致的应用内体验。
+- 已改为独立的 `api-key-trigger`，始终显示在顶部操作区，不受欢迎页诊断控件隐藏规则影响。
+- 新增与主界面一致的深色 API 设置窗口，支持密码输入、取消、Esc 关闭、空值提示、保存 / 重连状态和失败重试。
+- 保存仍通过现有 `configure-deepseek-api` IPC 写入本机专用配置、备份旧配置并触发 Codex 重连，不在界面显示完整 API Key。
+- 已通过三个 JavaScript 语法检查、`npm test` 和 `git diff --check`；已重新生成并安装 `dist\\DeepSeek-Codex-Setup-1.0.15.exe`。
+- 用户实际验证通过：顶部“更换 API”按钮可打开应用内设置窗口，更换 API Key 后可以成功重连并发送消息。
+
+## 11. 2026-08-12 — 1.0.16 顶部网络状态简化
+
+- 顶部状态从“代理 · 运行中 :17890”改为面向用户的“网络正常 / 联网失败”，不再暴露代理实现和端口。
+- 通过本地连接组件建立 HTTPS CONNECT 隧道并访问 `api.deepseek.com`，以真实网络结果决定绿色或红色状态。
+- 启动检测期间显示“网络检测中”；网络组件退出、探测超时或目标不可达时显示“联网失败”。
+- 已保留现有 Codex 代理注入、自动重连和 API 更换功能，状态展示与底层实现解耦。
+- 已通过三个 JavaScript 语法检查、`npm test` 和 `git diff --check`；本地安装包待重新生成并进行 GUI 验收。
+
+## 12. 2026-08-12 — 1.0.17 顶部网络状态颜色修复
+
+- 提高角色主题下网络状态选择器优先级，确保“网络正常”为绿色、“联网失败”为红色、“网络检测中”为琥珀色。
+- 不改变真实 HTTPS 连通性探测、内置连接组件或 Codex 会话链路。
+- 已通过三个 JavaScript 检查、`npm test` 和 `git diff --check`。
+- 已重新生成并安装 `dist\\DeepSeek-Codex-Setup-1.0.17.exe`；本机 GUI 实际验收确认角色主题下“网络正常”为绿色，状态文字、主题和原有连接链路均正常。
+
+## 13. 2026-08-12 — 1.0.18 API 识别信息与命名
+
+- “更换 API”窗口新增当前连接信息卡，显示本机保存的名称和脱敏 Key，仅保留识别所需的头部与尾部。
+- 更换 API 时支持填写名称；名称写入 `C:\Users\\<用户名>\\.deepseek-codex-gui\\api-key-profile.json`，不保存第二份完整 Key。
+- API Key 仍由 Codex 配置文件保存，界面和日志不显示完整内容。
+- 已通过三个 JavaScript 语法检查、`npm test` 和 `git diff --check`。
+- 已重新生成并安装 `dist\\DeepSeek-Codex-Setup-1.0.18.exe`；客户端窗口可正常启动。更换 API 面板的视觉捕获因桌面自动化窗口句柄失效暂未完成，仍需人工打开面板确认。
+- 用户已完成 API 名称与脱敏 Key 面板的实际 GUI 验收。
+- 安装器欢迎页、完成页和首次启动引导已统一为“安装与使用无需额外代理软件，应用自动完成网络连接”，并移除旧的代理提示文案。
+- 已重新生成最终 `dist\\DeepSeek-Codex-Setup-1.0.18.exe`，准备通过版本标签触发 GitHub Actions 自动发布。
 ## 6.12 2026-08-09 — 首次启动安装引导
 
 - 安装包首次启动显示引导向导，依次说明 Codex CLI、DeepSeek API、连接检测和权限设置。

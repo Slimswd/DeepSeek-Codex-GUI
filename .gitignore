@@ -4,6 +4,7 @@ dist/
 release-notes-web-v1.1.0/
 *.zip
 *.exe
+!resources/mihomo/mihomo.exe
 resources/codex-cli/*.tgz
 
 # Local backups and temporary snapshots

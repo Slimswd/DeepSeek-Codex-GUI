@@ -22,7 +22,7 @@
 !define MUI_WELCOMEPAGE_TITLE_3LINES
 !define MUI_FINISHPAGE_TITLE_3LINES
 !define MUI_FINISHPAGE_TITLE "安装完成"
-!define MUI_FINISHPAGE_TEXT "DeepSeek Codex 已成功安装。$\r$\n$\r$\n安装无需代理。使用 DeepSeek API 执行 Codex 任务时，请确保网络可访问 DeepSeek，必要时开启代理。$\r$\n$\r$\n首次启动将自动检查 Codex CLI 与 API 配置，并通过引导帮助您完成必要设置。"
+!define MUI_FINISHPAGE_TEXT "DeepSeek Codex 已成功安装。$\r$\n$\r$\n安装和使用均无需另行安装或开启代理软件，应用会自动完成 DeepSeek 网络连接。$\r$\n$\r$\n首次启动将自动检查 Codex CLI 与 API 配置，并通过引导帮助您完成必要设置。"
 
 ; The install-mode page is skipped for new installs so the visible journey is
 ; Welcome -> Location -> Install -> Complete. Existing all-user installs keep
@@ -40,7 +40,7 @@
 
 !macro customWelcomePage
   !define MUI_WELCOMEPAGE_TITLE "欢迎使用 DeepSeek Codex"
-!define MUI_WELCOMEPAGE_TEXT "面向 Windows 的智能开发 Agent$\r$\n$\r$\nDeepSeek Codex 将安装桌面客户端与内置 Codex CLI，帮助您更高效地构建、运行与管理开发任务。$\r$\n$\r$\n• 内置 Codex CLI$\r$\n• 本地保存配置$\r$\n• 安装过程无需代理$\r$\n• 使用 DeepSeek 服务可能需要代理$\r$\n$\r$\n单击“下一步”继续。"
+!define MUI_WELCOMEPAGE_TEXT "面向 Windows 的智能开发 Agent$\r$\n$\r$\nDeepSeek Codex 将安装桌面客户端与内置 Codex CLI，帮助您更高效地构建、运行与管理开发任务。$\r$\n$\r$\n• 内置 Codex CLI$\r$\n• 本地保存配置$\r$\n• 安装与使用无需额外代理软件$\r$\n• 自动完成 DeepSeek 网络连接$\r$\n$\r$\n单击“下一步”继续。"
   !define MUI_PAGE_CUSTOMFUNCTION_SHOW BrandWelcomeShow
   !insertmacro MUI_PAGE_WELCOME
 !macroend
@@ -122,7 +122,7 @@ BrandDirectoryBrushReady:
   Pop $0
   SetCtlColors $0 "AAB4BF" "0B121A"
 
-  ${NSD_CreateLabel} 0u 132u 300u 18u "内置 Codex CLI  ·  本地配置  ·  常规安装无需代理"
+  ${NSD_CreateLabel} 0u 132u 300u 18u "内置 Codex CLI  ·  本地配置  ·  全程无需额外代理软件"
   Pop $0
   SetCtlColors $0 "F47721" "0B121A"
 

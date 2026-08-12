@@ -15,6 +15,12 @@ const sideChatForm = document.querySelector(".side-chat-form");
 const sideChatInput = document.querySelector(".side-chat-input");
 const sideChatToggle = document.querySelector(".side-chat-toggle");
 const checkUpdateButton = document.querySelector(".check-update-button");
+const topbarActions = topbar?.querySelector(".topbar-actions");
+const networkStatusPill = document.createElement("div");
+networkStatusPill.className = "network-status-pill";
+networkStatusPill.textContent = "网络检测中";
+networkStatusPill.title = "当前网络连接状态";
+if (topbarActions) topbarActions.prepend(networkStatusPill);
 const updateProgressToast = document.querySelector(".update-progress-toast");
 const updateProgressBar = document.querySelector(".update-progress-bar");
 const updateDialog = document.querySelector(".update-dialog-overlay");
@@ -364,6 +370,10 @@ const turnStatusStyle =
   document.createElement("style");
 
 turnStatusStyle.textContent = `
+.network-status-pill { border: 1px solid #344452; border-radius: 999px; background: #151c25; color: #c7d2de; font-size: 12px; padding: 7px 11px; white-space: nowrap; }
+.network-status-pill.checking { border-color: #8a6b3f !important; color: #e2bd7e !important; }
+.network-status-pill.normal { border-color: #2f9b65 !important; color: #8ed6a5 !important; }
+.network-status-pill.error { border-color: #b86145 !important; color: #f0b0a0 !important; }
 .topbar-status-group {
   display: flex;
   align-items: center;
@@ -770,10 +780,148 @@ diagnosticsButton.textContent = "诊断";
 diagnosticsButton.title =
   "查看最近错误和运行环境";
 
-if (modelPill?.parentElement) {
-  modelPill.parentElement.appendChild(
-    diagnosticsButton
-  );
+const apiKeyButton = document.createElement("button");
+apiKeyButton.type = "button";
+apiKeyButton.className = "api-key-trigger";
+apiKeyButton.textContent = "更换 API";
+apiKeyButton.title = "更换 DeepSeek API Key";
+
+const apiKeyDialog = document.createElement("div");
+apiKeyDialog.className = "api-key-dialog";
+apiKeyDialog.hidden = true;
+apiKeyDialog.innerHTML = `
+  <section class="api-key-dialog-card" role="dialog" aria-modal="true" aria-labelledby="api-key-dialog-title">
+    <div class="api-key-dialog-header">
+      <div>
+        <div class="api-key-dialog-eyebrow">CONNECTION · API</div>
+        <h2 id="api-key-dialog-title">更换 DeepSeek API</h2>
+      </div>
+      <button type="button" class="api-key-dialog-close" aria-label="关闭">×</button>
+    </div>
+    <p class="api-key-dialog-description">仅保存到本机的 Codex 配置，不会显示完整密钥，也不会上传 API Key。</p>
+    <div class="api-key-current-card">
+      <div class="api-key-current-heading"><span>当前连接</span><span class="api-key-current-state">本机配置</span></div>
+      <div class="api-key-current-name">未配置</div>
+      <code class="api-key-current-value">未配置</code>
+    </div>
+    <div class="api-key-dialog-section-title">更换连接</div>
+    <label class="api-key-dialog-label">
+      名称
+      <input class="api-key-dialog-name" type="text" maxlength="40" autocomplete="off" spellcheck="false" placeholder="例如：家里台式电脑 Codex" />
+    </label>
+    <label class="api-key-dialog-label">
+      DeepSeek API Key
+      <input class="api-key-dialog-input" type="password" autocomplete="off" spellcheck="false" placeholder="sk-..." />
+    </label>
+    <div class="api-key-dialog-status" role="status" aria-live="polite">保存后会自动重新连接。</div>
+    <div class="api-key-dialog-actions">
+      <button type="button" class="api-key-dialog-cancel">取消</button>
+      <button type="button" class="api-key-dialog-save">保存并重连</button>
+    </div>
+  </section>
+`;
+
+const apiKeyInput = apiKeyDialog.querySelector(".api-key-dialog-input");
+const apiKeyNameInput = apiKeyDialog.querySelector(".api-key-dialog-name");
+const apiKeyStatus = apiKeyDialog.querySelector(".api-key-dialog-status");
+const apiKeySaveButton = apiKeyDialog.querySelector(".api-key-dialog-save");
+const apiKeyCurrentName = apiKeyDialog.querySelector(".api-key-current-name");
+const apiKeyCurrentValue = apiKeyDialog.querySelector(".api-key-current-value");
+const apiKeyCurrentState = apiKeyDialog.querySelector(".api-key-current-state");
+
+function renderApiKeyProfile(profile) {
+  if (!apiKeyCurrentName || !apiKeyCurrentValue) return;
+  const configured = Boolean(profile?.configured);
+  apiKeyCurrentName.textContent = configured ? (profile.name || "未命名 API") : "未配置";
+  apiKeyCurrentValue.textContent = configured ? (profile.maskedKey || "已配置") : "未配置";
+  if (apiKeyCurrentState) {
+    apiKeyCurrentState.textContent = configured ? "已配置" : "未配置";
+    apiKeyCurrentState.dataset.configured = String(configured);
+  }
+  apiKeyCurrentValue.title = configured ? "仅显示脱敏信息，完整 Key 不会显示在界面" : "尚未配置 DeepSeek API Key";
+}
+
+async function refreshApiKeyProfile() {
+  try {
+    const profile = await window.deepseekCodex.getDeepSeekApiProfile?.();
+    renderApiKeyProfile(profile);
+    if (profile?.configured && apiKeyNameInput && !apiKeyNameInput.value) {
+      apiKeyNameInput.value = profile.name === "未命名 API" ? "" : profile.name;
+    }
+  } catch {
+    renderApiKeyProfile({ configured: false });
+  }
+}
+
+function closeApiKeyDialog() {
+  apiKeyDialog.hidden = true;
+  apiKeyInput.value = "";
+  apiKeyNameInput.value = "";
+  apiKeyStatus.textContent = "保存后会自动重新连接。";
+  apiKeyStatus.classList.remove("is-error", "is-success");
+  apiKeySaveButton.disabled = false;
+  apiKeySaveButton.textContent = "保存并重连";
+}
+
+function openApiKeyDialog() {
+  apiKeyDialog.hidden = false;
+  apiKeyInput.value = "";
+  apiKeyNameInput.value = "";
+  apiKeyStatus.textContent = "保存后会自动重新连接。";
+  apiKeyStatus.classList.remove("is-error", "is-success");
+  apiKeySaveButton.disabled = false;
+  apiKeySaveButton.textContent = "保存并重连";
+  void refreshApiKeyProfile();
+  requestAnimationFrame(() => apiKeyInput.focus());
+}
+
+apiKeyButton.addEventListener("click", event => {
+  event.stopPropagation();
+  openApiKeyDialog();
+});
+
+apiKeyDialog.querySelector(".api-key-dialog-close").addEventListener("click", closeApiKeyDialog);
+apiKeyDialog.querySelector(".api-key-dialog-cancel").addEventListener("click", closeApiKeyDialog);
+apiKeyDialog.addEventListener("click", event => {
+  if (event.target === apiKeyDialog) closeApiKeyDialog();
+});
+apiKeyInput.addEventListener("keydown", event => {
+  if (event.key === "Enter") apiKeySaveButton.click();
+  if (event.key === "Escape") closeApiKeyDialog();
+});
+apiKeySaveButton.addEventListener("click", async () => {
+  const key = apiKeyInput.value.trim();
+  const name = apiKeyNameInput.value.trim();
+  if (!key) {
+    apiKeyStatus.textContent = "请先粘贴 API Key。";
+    apiKeyStatus.classList.add("is-error");
+    apiKeyInput.focus();
+    return;
+  }
+
+  apiKeySaveButton.disabled = true;
+  apiKeySaveButton.textContent = "正在保存…";
+  apiKeyStatus.textContent = "正在保存并重新连接…";
+  apiKeyStatus.classList.remove("is-error", "is-success");
+  try {
+    const result = await window.deepseekCodex.configureDeepSeekApi({ apiKey: key, name });
+    renderApiKeyProfile(result?.profile);
+    apiKeyInput.value = "";
+    apiKeyNameInput.value = "";
+    apiKeyStatus.textContent = "API Key 已保存，正在重新连接。";
+    apiKeyStatus.classList.add("is-success");
+    window.setTimeout(closeApiKeyDialog, 900);
+  } catch (error) {
+    apiKeyStatus.textContent = error?.message || "保存失败，请检查 API Key。";
+    apiKeyStatus.classList.add("is-error");
+    apiKeySaveButton.disabled = false;
+    apiKeySaveButton.textContent = "保存并重连";
+  }
+});
+
+if (topbar?.querySelector(".topbar-actions")) {
+  topbar.querySelector(".topbar-actions").appendChild(apiKeyButton);
+  topbar.querySelector(".topbar-actions").appendChild(diagnosticsButton);
 }
 
 const diagnosticsPanel =
@@ -931,6 +1079,7 @@ diagnosticsPanel
   });
 
 document.body.appendChild(diagnosticsPanel);
+document.body.appendChild(apiKeyDialog);
 
 document.addEventListener("click", event => {
   if (
@@ -960,6 +1109,236 @@ diagnosticsStyle.textContent = `
   border-color: #6f87a4;
   background: #1b2633;
   color: #e4edf7;
+}
+
+.api-key-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 11px;
+  border: 1px solid #2c3744;
+  border-radius: 999px;
+  background: #151c25;
+  color: #aebdce;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.api-key-trigger:hover {
+  border-color: #6f87a4;
+  background: #1b2633;
+  color: #e4edf7;
+}
+
+.api-key-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 100001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(3, 8, 14, .62);
+  backdrop-filter: blur(12px);
+}
+
+.api-key-dialog[hidden] {
+  display: none;
+}
+
+.api-key-dialog-card {
+  width: min(460px, calc(100vw - 40px));
+  padding: 22px;
+  border: 1px solid #3d4d60;
+  border-radius: 16px;
+  background: #101923;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .48);
+}
+
+.api-key-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.api-key-dialog-eyebrow {
+  margin-bottom: 6px;
+  color: #d27b2c;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+
+.api-key-dialog-header h2 {
+  margin: 0;
+  color: #e9f0f7;
+  font-size: 19px;
+}
+
+.api-key-dialog-close {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #344454;
+  border-radius: 8px;
+  background: transparent;
+  color: #9eadbf;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.api-key-dialog-close:hover {
+  border-color: #6d8fc0;
+  color: #fff;
+}
+
+.api-key-dialog-description {
+  margin: 16px 0;
+  color: #9eadbf;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.api-key-current-card {
+  margin: 0 0 17px;
+  padding: 12px 13px;
+  border: 1px solid #2f4052;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(26, 39, 53, .9), rgba(12, 20, 29, .92));
+}
+
+.api-key-current-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #93a6ba;
+  font-size: 11px;
+}
+
+.api-key-current-state {
+  color: #8ed6a5;
+  font-size: 10px;
+}
+
+.api-key-current-state[data-configured="false"] {
+  color: #93a6ba;
+}
+
+.api-key-current-name {
+  margin-top: 8px;
+  color: #e8f0f7;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.api-key-current-value {
+  display: block;
+  margin-top: 5px;
+  overflow: hidden;
+  color: #d0a067;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.api-key-dialog-section-title {
+  margin: 0 0 9px;
+  color: #d6e1eb;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.api-key-dialog-label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #c9d6e4;
+  font-size: 12px;
+}
+
+.api-key-dialog-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  border: 1px solid #3b4d61;
+  border-radius: 9px;
+  outline: none;
+  background: #0b121a;
+  color: #e6eef6;
+  font: inherit;
+  font-size: 13px;
+}
+
+.api-key-dialog-name {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  border: 1px solid #3b4d61;
+  border-radius: 9px;
+  outline: none;
+  background: #0b121a;
+  color: #e6eef6;
+  font: inherit;
+  font-size: 13px;
+}
+
+.api-key-dialog-name:focus {
+  border-color: #d27b2c;
+  box-shadow: 0 0 0 3px rgba(210, 123, 44, .14);
+}
+
+.api-key-dialog-input:focus {
+  border-color: #d27b2c;
+  box-shadow: 0 0 0 3px rgba(210, 123, 44, .14);
+}
+
+.api-key-dialog-status {
+  min-height: 18px;
+  margin-top: 9px;
+  color: #8191a5;
+  font-size: 11px;
+}
+
+.api-key-dialog-status.is-error { color: #f0a0a0; }
+.api-key-dialog-status.is-success { color: #8ed6a5; }
+
+.api-key-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.api-key-dialog-actions button {
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid #3b4b5d;
+  border-radius: 8px;
+  background: transparent;
+  color: #b9c7d6;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.api-key-dialog-actions .api-key-dialog-save {
+  border-color: #d27b2c;
+  background: #c66d23;
+  color: #fff;
+}
+
+.api-key-dialog-actions button:hover {
+  border-color: #e19a58;
+}
+
+.api-key-dialog-actions button:disabled {
+  cursor: wait;
+  opacity: .62;
 }
 
 .diagnostics-panel {
@@ -1087,8 +1466,8 @@ tokenUsagePill.textContent = "上下文 --";
 tokenUsagePill.title =
   "查看 Context / Token 使用情况";
 
-if (modelPill?.parentElement) {
-  modelPill.parentElement.insertBefore(
+if (topbarActions) {
+  topbarActions.insertBefore(
     tokenUsagePill,
     diagnosticsButton
   );
@@ -1283,7 +1662,8 @@ document.head.appendChild(tokenUsageStyle);
 
 const gitReviewCenter =
   window.DeepSeekGitReview?.create({
-    toolbarParent: modelPill?.parentElement || null,
+    toolbarParent:
+      topbarActions || modelPill?.parentElement || null,
     beforeElement: diagnosticsButton || null
   }) || null;
 
@@ -1363,8 +1743,8 @@ themeButton.className = "theme-trigger";
 themeButton.textContent = "主题";
 themeButton.title = "切换界面主题皮肤";
 
-if (modelPill?.parentElement) {
-  modelPill.parentElement.insertBefore(
+if (topbar?.querySelector(".topbar-actions")) {
+  topbar.querySelector(".topbar-actions").insertBefore(
     themeButton,
     diagnosticsButton
   );
@@ -2391,9 +2771,12 @@ html[data-theme="kingkai"] .logo { background-position: 100% 100% !important; }
 .model-pill,
 .turn-status-pill,
 .diagnostics-trigger,
+.api-key-trigger,
 .token-usage-trigger,
 .git-status-trigger,
-.theme-trigger {
+.theme-trigger,
+.embedded-proxy-pill,
+.network-status-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2410,9 +2793,12 @@ html[data-theme="kingkai"] .logo { background-position: 100% 100% !important; }
 
 .new-task:hover,
 .diagnostics-trigger:hover,
+.api-key-trigger:hover,
 .token-usage-trigger:hover,
 .git-status-trigger:hover,
-.theme-trigger:hover {
+.theme-trigger:hover,
+.embedded-proxy-pill:hover,
+.network-status-pill:hover {
   background: var(--theme-accent-surface) !important;
   border-color: var(--theme-accent-alt) !important;
 }
@@ -3039,12 +3425,30 @@ html.character-theme .sidebar-bottom {
 html.character-theme .model-pill,
 html.character-theme .turn-status-pill,
 html.character-theme .diagnostics-trigger,
+html.character-theme .api-key-trigger,
 html.character-theme .token-usage-trigger,
 html.character-theme .git-status-trigger,
-html.character-theme .theme-trigger {
+html.character-theme .theme-trigger,
+html.character-theme .embedded-proxy-pill,
+html.character-theme .network-status-pill {
   background: color-mix(in srgb, var(--theme-panel) 74%, transparent) !important;
   border-color: color-mix(in srgb, var(--theme-accent) 24%, var(--theme-border-strong)) !important;
   backdrop-filter: blur(14px);
+}
+
+html.character-theme .topbar-actions .network-status-pill.normal {
+  color: #8ed6a5 !important;
+  border-color: #2f9b65 !important;
+}
+
+html.character-theme .topbar-actions .network-status-pill.error {
+  color: #f0b0a0 !important;
+  border-color: #b86145 !important;
+}
+
+html.character-theme .topbar-actions .network-status-pill.checking {
+  color: #e2bd7e !important;
+  border-color: #8a6b3f !important;
 }
 
 html.character-theme .chat {
@@ -3668,7 +4072,7 @@ async function maybeShowOnboarding() {
   overlay.innerHTML = `
     <section class="onboarding-card" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
       <h2 id="onboarding-title">欢迎使用 DeepSeek Codex</h2>
-      <p class="onboarding-lead">首次使用只需完成下面几项检查。安装过程无需代理；完成配置后，访问 DeepSeek 服务可能需要开启代理。API 密钥不会被本软件读取、上传或自动复制。</p>
+      <p class="onboarding-lead">首次使用只需完成下面几项检查。安装和使用均无需另行安装或开启代理软件，应用会自动完成 DeepSeek 网络连接。API 密钥不会被本软件读取、上传或自动复制。</p>
       <div class="onboarding-step"><b class="onboarding-number">1</b><div><strong>自动检查 Codex CLI</strong><span data-codex-status>正在检查…</span><br><button class="onboarding-action" data-install-codex>一键安装 Codex CLI</button><button class="onboarding-action" data-check-codex>重新检查</button></div></div>
       <div class="onboarding-step"><b class="onboarding-number">2</b><div><strong>粘贴 DeepSeek API Key</strong><span>只需粘贴以 sk- 开头的 Key，软件会自动写入专用配置并重启连接。不会显示完整 Key。</span><br><input class="onboarding-api-input" type="password" placeholder="粘贴 API Key（sk-...）" autocomplete="off"><button class="onboarding-action" data-save-api>保存并测试</button><span class="onboarding-api-status"></span></div></div>
       <div class="onboarding-step"><b class="onboarding-number">3</b><div><strong>自动测试连接</strong><span data-connection-status>正在读取当前连接状态…</span><br><button class="onboarding-action" data-test-connection>重新检测基础接口</button><button class="onboarding-action" data-test-task>发送实际测试任务</button></div></div>
@@ -3683,7 +4087,7 @@ async function maybeShowOnboarding() {
     try {
       const current = await window.deepseekCodex.getAgentState();
       const result = await window.deepseekCodex.testDeepSeekConnection();
-      status.innerHTML = `网络：${result.network}（未验证实际 Codex 任务）<br>API Key：${result.auth}<br>代理：${result.proxy}<br>Agent：${current?.status === "ready" ? "服务已连接，任务待验证" : current?.status || "未连接"}`;
+      status.innerHTML = `网络：${result.network}（未验证实际 Codex 任务）<br>API Key：${result.auth}<br>Agent：${current?.status === "ready" ? "服务已连接，任务待验证" : current?.status || "未连接"}`;
       status.classList.remove("onboarding-check");
       status.classList.toggle("onboarding-warning", Boolean(result.ok && current?.status === "ready"));
       return result;
@@ -3738,7 +4142,7 @@ async function maybeShowOnboarding() {
       status.classList.remove("onboarding-warning");
       status.classList.add("onboarding-check");
     } catch (error) {
-      status.innerHTML = `实际 Codex 任务失败：${error.message || "流式连接中断"}<br>请检查网络，必要时开启代理。`;
+      status.innerHTML = `实际 Codex 任务失败：${error.message || "流式连接中断"}<br>请检查网络后重试；应用会自动完成连接，无需另行开启代理软件。`;
     } finally { button.disabled = false; }
   });
   const close = async () => { await window.deepseekCodex.completeOnboarding(); overlay.remove(); style.remove(); };
@@ -4138,6 +4542,15 @@ function renderState(state) {
 
   const reasoning =
     reasoningDisplayLabel(state.reasoning);
+
+  const network = state.embeddedProxy;
+  if (networkStatusPill) {
+    const networkState = network?.networkStatus || (network?.running ? "checking" : "error");
+    networkStatusPill.classList.toggle("checking", networkState === "checking");
+    networkStatusPill.classList.toggle("normal", networkState === "ok");
+    networkStatusPill.classList.toggle("error", networkState === "error");
+    networkStatusPill.textContent = networkState === "ok" ? "网络正常" : networkState === "error" ? "联网失败" : "网络检测中";
+  }
 
   gitReviewCenter?.setProjectPath(
     state.projectPath || null
