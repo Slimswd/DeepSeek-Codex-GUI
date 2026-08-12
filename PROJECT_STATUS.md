@@ -541,7 +541,8 @@
 - 已重新生成并安装 `dist\\DeepSeek-Codex-Setup-1.0.18.exe`；客户端窗口可正常启动。更换 API 面板的视觉捕获因桌面自动化窗口句柄失效暂未完成，仍需人工打开面板确认。
 - 用户已完成 API 名称与脱敏 Key 面板的实际 GUI 验收。
 - 安装器欢迎页、完成页和首次启动引导已统一为“安装与使用无需额外代理软件，应用自动完成网络连接”，并移除旧的代理提示文案。
-- 已重新生成最终 `dist\\DeepSeek-Codex-Setup-1.0.18.exe`，准备通过版本标签触发 GitHub Actions 自动发布。
+- 已重新生成最终 `dist\\DeepSeek-Codex-Setup-1.0.18.exe`。
+- 已推送 `v1.0.18` 标签并完成 GitHub Actions 自动发布；EXE、blockmap 和 `latest.yml` 均已确认可下载。
 ## 6.12 2026-08-09 — 首次启动安装引导
 
 - 安装包首次启动显示引导向导，依次说明 Codex CLI、DeepSeek API、连接检测和权限设置。
