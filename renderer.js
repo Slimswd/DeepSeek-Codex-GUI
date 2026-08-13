@@ -6467,6 +6467,26 @@ recentProjectStyle.textContent = `
   font-size: 13px;
   padding: 8px 10px;
 }
+
+.new-project {
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 12px;
+  border: 1px solid #2d3b4b;
+  border-radius: 10px;
+  background: rgba(19, 29, 40, .72);
+  color: #aebdca;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.new-project:hover {
+  border-color: #f47721;
+  color: #fff;
+  background: rgba(244, 119, 33, .08);
+}
 `;
 
 document.head.appendChild(
@@ -6478,6 +6498,8 @@ document.head.appendChild(
 
 const newTaskButton =
   document.querySelector(".new-task");
+const newProjectButton =
+  document.querySelector(".new-project");
 
 const initialWelcomeHtml =
   document.querySelector(".welcome")
@@ -6526,6 +6548,34 @@ newTaskButton.addEventListener(
     }
   }
 );
+
+newProjectButton?.addEventListener("click", async () => {
+  try {
+    const selectedPath = await window.deepseekCodex.selectProject();
+    if (!selectedPath) return;
+    setProjectButtonPath(selectedPath);
+    if (projectName) projectName.textContent = shortPath(selectedPath);
+    await window.deepseekCodex.newTask();
+    selectedThreadId = null;
+    pendingThreadSelection = false;
+    currentAssistantBubble = null;
+    lastTurnRequest = null;
+    busy = false;
+    sendButton.disabled = false;
+    textarea.value = "";
+    activityCards.clear();
+    activityStartedAt = null;
+    activityFinishedAt = null;
+    currentProgressPanel = null;
+    currentProgressSteps = [];
+    chat.innerHTML = initialWelcomeHtml || `<div class="welcome"><p>已创建新的项目任务，可以开始工作。</p></div>`;
+    applyTheme(currentTheme);
+    chat.scrollTop = 0;
+    await renderRecentProjects();
+  } catch (error) {
+    alert("新建项目失败：" + error.message);
+  }
+});
 
 
 // ===== 历史任务列表 =====

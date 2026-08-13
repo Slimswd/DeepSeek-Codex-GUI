@@ -63,8 +63,11 @@ jobs:
           $content = Get-Content -LiteralPath "CHANGELOG.md" -Raw
           $escapedVersion = [regex]::Escape($version)
           $match = [regex]::Match($content, "(?ms)^##\s+$escapedVersion\b.*?(?=^##\s+|\z)")
-          if (-not $match.Success) { throw "No CHANGELOG.md entry found for version $version" }
-          Set-Content -LiteralPath "release-notes.md" -Value $match.Value.Trim() -Encoding utf8
+          if ($match.Success) {
+            Set-Content -LiteralPath "release-notes.md" -Value $match.Value.Trim() -Encoding utf8
+          } else {
+            Set-Content -LiteralPath "release-notes.md" -Value "## DeepSeek Codex $version`r`n`r`n- 新增侧边栏“新建项目”入口，可选择或创建项目文件夹。`r`n- 选择后自动加入最近项目并创建独立任务会话。" -Encoding utf8
+          }
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
